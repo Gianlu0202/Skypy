@@ -52,7 +52,21 @@ export async function enterAndJoin(page: Page, name: string): Promise<void> {
   await expect.poll(() => sessionId(page)).not.toBeNull();
 }
 
-export async function store(page: Page): Promise<{ state: RoomState | null; sessionId: string | null; memberId: string | null; host: boolean; hostData: { invites: Record<string, string> } | null; media: string; mic: boolean; cam: boolean; chat: { text: string; name: string }[] }> {
+export interface StoreSnapshot {
+  state: RoomState | null;
+  sessionId: string | null;
+  memberId: string | null;
+  host: boolean;
+  hostData: { invites: Record<string, string> } | null;
+  media: string;
+  signal: string;
+  mic: boolean;
+  cam: boolean;
+  chat: { text: string; name: string }[];
+  ended: { kind: string; message?: string } | null;
+}
+
+export async function store(page: Page): Promise<StoreSnapshot> {
   return page.evaluate(() => (window as unknown as { __skypy: { state: () => unknown } }).__skypy.state() as never);
 }
 

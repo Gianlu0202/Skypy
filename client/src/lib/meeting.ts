@@ -32,6 +32,14 @@ export interface JoinOptions {
   camOn: boolean;
 }
 
+/**
+ * Load-testing switch, set only by automation (window.__skypyLite = true):
+ * publish a tiny camera and receive no media, so one machine can simulate a
+ * full class. Never set in normal use.
+ */
+export const LITE = (window as unknown as { __skypyLite?: boolean }).__skypyLite === true;
+export const CAMERA_RESOLUTION = LITE ? VideoPresets.h180.resolution : VideoPresets.h720.resolution;
+
 let current: Meeting | null = null;
 
 export function currentMeeting(): Meeting | null {
@@ -87,7 +95,7 @@ export class Meeting {
       adaptiveStream: true,
       dynacast: true,
       disconnectOnPageLeave: true,
-      videoCaptureDefaults: { resolution: VideoPresets.h720.resolution, deviceId: prefs.camId },
+      videoCaptureDefaults: { resolution: CAMERA_RESOLUTION, deviceId: prefs.camId },
       audioCaptureDefaults: {
         deviceId: prefs.micId,
         echoCancellation: true,
@@ -96,7 +104,7 @@ export class Meeting {
       },
       audioOutput: prefs.speakerId ? { deviceId: prefs.speakerId } : undefined,
       publishDefaults: {
-        simulcast: true,
+        simulcast: !LITE,
         videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360],
         screenShareEncoding: ScreenSharePresets.h1080fps15.encoding,
         dtx: true,
@@ -320,7 +328,7 @@ export class Meeting {
     window.clearTimeout(this.retryTimer);
     useStore.setState({ media: this.everConnected ? 'reconnecting' : 'connecting' });
     try {
-      await this.room.connect(this.livekit.url, this.livekit.token, { autoSubscribe: true });
+      await this.room.connect(this.livekit.url, this.livekit.token, { autoSubscribe: !LITE });
       if (this.stopped) {
         await this.room.disconnect();
         return;
@@ -344,7 +352,9 @@ export class Meeting {
   private scheduleMediaRetry(): void {
     if (this.stopped) return;
     window.clearTimeout(this.retryTimer);
-    const delay = Math.min(15_000, 1000 * 2 ** this.retryAttempt);
+    // Exponential backoff with jitter so a whole class never retries in lockstep.
+    const base = Math.min(15_000, 1000 * 2 ** this.retryAttempt);
+    const delay = base * (0.6 + Math.random() * 0.8);
     this.retryAttempt++;
     this.retryTimer = window.setTimeout(() => void this.connectMedia(), delay);
   }

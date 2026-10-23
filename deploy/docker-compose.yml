@@ -1,0 +1,51 @@
+# Self-hosted Skypy on one Linux server with a domain name:
+#   Caddy (automatic HTTPS) → Skypy app + LiveKit media server.
+#
+#   1. Point DNS for your domain (e.g. meet.example.edu) at the server.
+#   2. Open firewall ports: 80/tcp, 443/tcp, 7881/tcp, 3478/udp, 50000-60000/udp.
+#   3. cp deploy/.env.example deploy/.env  and fill it in.
+#   4. docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+#
+# Everything runs with host networking so WebRTC media ports work directly.
+services:
+  livekit:
+    image: livekit/livekit-server:v1.13
+    restart: unless-stopped
+    network_mode: host
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+
+  skypy:
+    build: ..
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PORT: "3000"
+      HOST: "127.0.0.1"
+      LIVEKIT_URL: "wss://${DOMAIN}"
+      LIVEKIT_API_URL: "http://127.0.0.1:7880"
+      LIVEKIT_API_KEY: "${LIVEKIT_API_KEY}"
+      LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET}"
+    volumes:
+      - skypy-data:/data
+    depends_on:
+      - livekit
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      DOMAIN: "${DOMAIN}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  skypy-data:
+  caddy-data:
+  caddy-config:

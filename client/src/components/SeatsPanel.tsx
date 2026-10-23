@@ -51,7 +51,8 @@ export function SeatsPanel({ meeting }: { meeting: Meeting }) {
       .filter(Boolean)
       .slice(0, LIMITS.rosterImport);
     if (names.length === 0) return;
-    if (replace && reservedCount > 0 && !confirm('Replace the whole seating chart with this list? Current reservations will be cleared.')) return;
+    if (replace && reservedCount > 0 && !confirm('Replace the whole seating chart with this list? Current reservations will be cleared.'))
+      return;
     meeting.send({ t: 'roster.import', names, replace });
     toast(`Seated ${names.length} ${names.length === 1 ? 'name' : 'names'} from your list.`, { tone: 'success' });
     setRoster('');
@@ -67,7 +68,13 @@ export function SeatsPanel({ meeting }: { meeting: Meeting }) {
       const seat = s.seat !== null && s.seat < cap ? s.seat : 9999;
       rowsOut.push({
         seat,
-        line: [seat === 9999 ? 'Extra' : seatLabel(seat, cols), csvCell(s.name), 'Present', new Date(s.joinedAt).toLocaleString(), s.host ? 'Yes' : ''].join(','),
+        line: [
+          seat === 9999 ? 'Extra' : seatLabel(seat, cols),
+          csvCell(s.name),
+          'Present',
+          new Date(s.joinedAt).toLocaleString(),
+          s.host ? 'Yes' : '',
+        ].join(','),
       });
     }
     state.seats.forEach((memberId, seat) => {
@@ -100,7 +107,12 @@ export function SeatsPanel({ meeting }: { meeting: Meeting }) {
               <b>{cap}</b> seats
             </span>
           </div>
-          <div className="seat-map" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }} role="grid" aria-label="Seating chart">
+          <div
+            className="seat-map"
+            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+            role="grid"
+            aria-label="Seating chart"
+          >
             {Array.from({ length: cap }, (_, seat) => {
               const reservedId = state.seats[seat];
               const sitting = sittingAt.get(seat);
@@ -163,9 +175,21 @@ export function SeatsPanel({ meeting }: { meeting: Meeting }) {
         <section className="seats-section">
           <h3>Room shape</h3>
           <div className="size-row">
-            <Stepper label="Rows" value={rows} min={LIMITS.minRows} max={Math.min(LIMITS.maxRows, Math.floor(LIMITS.maxSeats / cols))} onChange={(v) => update({ rows: v })} />
+            <Stepper
+              label="Rows"
+              value={rows}
+              min={LIMITS.minRows}
+              max={Math.min(LIMITS.maxRows, Math.floor(LIMITS.maxSeats / cols))}
+              onChange={(v) => update({ rows: v })}
+            />
             <span className="size-x">×</span>
-            <Stepper label="Per row" value={cols} min={LIMITS.minCols} max={Math.min(LIMITS.maxCols, Math.floor(LIMITS.maxSeats / rows))} onChange={(v) => update({ cols: v })} />
+            <Stepper
+              label="Per row"
+              value={cols}
+              min={LIMITS.minCols}
+              max={Math.min(LIMITS.maxCols, Math.floor(LIMITS.maxSeats / rows))}
+              onChange={(v) => update({ cols: v })}
+            />
           </div>
           <p className="panel-hint">People keep their row and seat number when you resize.</p>
         </section>
@@ -302,7 +326,8 @@ export function SeatsPanel({ meeting }: { meeting: Meeting }) {
             className="btn btn-ghost btn-small danger"
             disabled={reservedCount === 0}
             onClick={() => {
-              if (confirm('Clear every seat reservation? People in the meeting stay where they are.')) meeting.send({ t: 'seats.clearAll' });
+              if (confirm('Clear every seat reservation? People in the meeting stay where they are.'))
+                meeting.send({ t: 'seats.clearAll' });
             }}
           >
             <Trash2 size={15} /> Clear all reservations
@@ -322,7 +347,11 @@ export function SeatsPanel({ meeting }: { meeting: Meeting }) {
           cols={cols}
           reservedId={state.seats[editing.seat] ?? null}
           reservedName={(state.seats[editing.seat] && members.get(state.seats[editing.seat]!)?.name) || null}
-          occupant={sittingAt.get(editing.seat) ? { memberId: sittingAt.get(editing.seat)!.memberId, name: sittingAt.get(editing.seat)!.name } : null}
+          occupant={
+            sittingAt.get(editing.seat)
+              ? { memberId: sittingAt.get(editing.seat)!.memberId, name: sittingAt.get(editing.seat)!.name }
+              : null
+          }
           invite={state.seats[editing.seat] ? (hostData?.invites[state.seats[editing.seat]!] ?? null) : null}
           roomId={state.id}
           meeting={meeting}

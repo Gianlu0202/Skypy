@@ -7,11 +7,7 @@ import { roomIdFromPath, usePath } from './lib/router.ts';
 export function App() {
   const path = usePath();
   const roomId = roomIdFromPath(path);
-  return (
-    <ErrorBoundary>
-      {path === '/' ? <Home /> : roomId ? <RoomPage key={roomId} roomId={roomId} /> : <NotFound />}
-    </ErrorBoundary>
-  );
+  return <ErrorBoundary>{path === '/' ? <Home /> : roomId ? <RoomPage key={roomId} roomId={roomId} /> : <NotFound />}</ErrorBoundary>;
 }
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

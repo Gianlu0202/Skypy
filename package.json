@@ -2,10 +2,10 @@
   "name": "skypy",
   "version": "1.0.0",
   "private": true,
-  "description": "Group video meetings where everyone keeps their seat — fixed seating, shared screens in the middle, every face stays on screen.",
+  "description": "Group video meetings where everyone keeps their seat \u2014 fixed seating, shared screens in the middle, every face stays on screen.",
   "type": "module",
   "engines": {
-    "node": ">=20.11"
+    "node": ">=20.12"
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
@@ -14,8 +14,10 @@
     "livekit": "node scripts/livekit.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "test:e2e": "playwright test",
-    "share": "node scripts/share.mjs"
+    "test:e2e": "npm run build && playwright test",
+    "share": "node scripts/share.mjs",
+    "format": "prettier --write .",
+    "load-test": "node tests/load/classroom.mjs"
   },
   "dependencies": {
     "express": "^5.3.0",
@@ -35,6 +37,7 @@
     "esbuild": "^0.28.2",
     "livekit-client": "^2.23.0",
     "lucide-react": "^1.61.0",
+    "prettier": "^3.9.10",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tsx": "^4.23.15",

@@ -120,6 +120,16 @@ function place(
   });
 }
 
+/**
+ * Grid for one side of the stage using the reference tile size, with rows
+ * filled evenly (16 faces in rows of 12 become 8 + 8, not 12 + 4).
+ */
+function balanced(count: number, ref: Grid): Grid {
+  if (count === 0) return { cols: 0, rows: 0, w: 0, h: 0 };
+  const rows = Math.ceil(count / Math.max(1, ref.cols));
+  return { cols: Math.ceil(count / rows), rows, w: ref.w, h: ref.h };
+}
+
 function byGridOrder(a: LayoutItem, b: LayoutItem): number {
   return a.row - b.row || a.col - b.col;
 }
@@ -177,11 +187,7 @@ function sides(input: LayoutInput): LayoutResult {
     count === 0 ? { cols: 0, rows: 0, w: 0, h: 0 } : bestGrid(count, panelW, H, GAP_SIDE, 1, STANDARD);
   // Same tile size on both sides so the class looks even.
   const ref = fitPanel(n);
-  const gridFor = (count: number): Grid => {
-    if (count === 0) return { cols: 0, rows: 0, w: 0, h: 0 };
-    const cols = Math.min(ref.cols, count);
-    return { cols, rows: Math.ceil(count / cols), w: ref.w, h: ref.h };
-  };
+  const gridFor = (count: number) => balanced(count, ref);
   const lg = gridFor(left.length);
   const rg = gridFor(right.length);
   const blockW = (g: Grid) => (g.cols === 0 ? 0 : g.cols * g.w + (g.cols - 1) * GAP_SIDE);
@@ -231,11 +237,7 @@ function stacked(input: LayoutInput): LayoutResult {
     return best;
   };
   const ref = bandGrid(n);
-  const gridFor = (count: number): Grid => {
-    if (count === 0) return { cols: 0, rows: 0, w: 0, h: 0 };
-    const cols = Math.min(ref.cols, count);
-    return { cols, rows: Math.ceil(count / cols), w: ref.w, h: ref.h };
-  };
+  const gridFor = (count: number) => balanced(count, ref);
   const tg = gridFor(top.length);
   const bg = gridFor(bottom.length);
   const blockH = (g: Grid) => (g.rows === 0 ? 0 : g.rows * g.h + (g.rows - 1) * GAP_SIDE);

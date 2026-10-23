@@ -1,6 +1,20 @@
 import { useMemo, useRef, useState } from 'react';
 import type { Participant } from 'livekit-client';
-import { Crown, Hand, Link2, Mic, MicOff, MoreHorizontal, Search, Sparkles, UserMinus, UserRoundCog, UserX, VolumeX, X } from 'lucide-react';
+import {
+  Crown,
+  Hand,
+  Link2,
+  Mic,
+  MicOff,
+  MoreHorizontal,
+  Search,
+  Sparkles,
+  UserMinus,
+  UserRoundCog,
+  UserX,
+  VolumeX,
+  X,
+} from 'lucide-react';
 import { normalizeName, seatLabel, type SessionView } from '../../../shared/protocol.ts';
 import { copyText, meetingUrl } from '../lib/format.ts';
 import { micMuted, useParticipant, useRoomEvents } from '../lib/hooks.ts';
@@ -88,18 +102,20 @@ export function PeoplePanel({ meeting }: { meeting: Meeting }) {
                 </button>
               )}
             </header>
-            {hands.filter((s) => match(s.name)).map((s, i) => (
-              <div className="person hand-row" key={s.id}>
-                <span className="hand-num">{i + 1}</span>
-                <Hand size={15} className="hand-icon" />
-                <span className="person-name">{s.id === sessionId ? `${s.name} (You)` : s.name}</span>
-                {(host || s.id === sessionId) && (
-                  <button className="btn btn-ghost btn-small" onClick={() => meeting.send({ t: 'hand.lower', sessionId: s.id })}>
-                    Lower
-                  </button>
-                )}
-              </div>
-            ))}
+            {hands
+              .filter((s) => match(s.name))
+              .map((s, i) => (
+                <div className="person hand-row" key={s.id}>
+                  <span className="hand-num">{i + 1}</span>
+                  <Hand size={15} className="hand-icon" />
+                  <span className="person-name">{s.id === sessionId ? `${s.name} (You)` : s.name}</span>
+                  {(host || s.id === sessionId) && (
+                    <button className="btn btn-ghost btn-small" onClick={() => meeting.send({ t: 'hand.lower', sessionId: s.id })}>
+                      Lower
+                    </button>
+                  )}
+                </div>
+              ))}
           </section>
         )}
 
@@ -107,20 +123,22 @@ export function PeoplePanel({ meeting }: { meeting: Meeting }) {
           <header>
             <span>In the meeting · {state.sessions.length}</span>
           </header>
-          {present.filter((s) => match(s.name)).map((s) => (
-            <PersonRow
-              key={s.id}
-              session={s}
-              participant={participants.get(s.id)}
-              isMe={s.id === sessionId}
-              seat={s.seat !== null && s.seat < state.seats.length ? seatLabel(s.seat, cols) : 'Extra'}
-              canManage={host}
-              spotlit={state.spotlight === s.id}
-              invite={hostData?.invites[s.memberId] ?? null}
-              roomId={state.id}
-              meeting={meeting}
-            />
-          ))}
+          {present
+            .filter((s) => match(s.name))
+            .map((s) => (
+              <PersonRow
+                key={s.id}
+                session={s}
+                participant={participants.get(s.id)}
+                isMe={s.id === sessionId}
+                seat={s.seat !== null && s.seat < state.seats.length ? seatLabel(s.seat, cols) : 'Extra'}
+                canManage={host}
+                spotlit={state.spotlight === s.id}
+                invite={hostData?.invites[s.memberId] ?? null}
+                roomId={state.id}
+                meeting={meeting}
+              />
+            ))}
         </section>
 
         {host && absent.length > 0 && (
@@ -128,26 +146,28 @@ export function PeoplePanel({ meeting }: { meeting: Meeting }) {
             <header>
               <span>Not here · {absent.length}</span>
             </header>
-            {absent.filter((a) => match(a.name)).map((a) => (
-              <div className="person absent" key={a.memberId}>
-                <Avatar name={a.name} colorKey={a.memberId} />
-                <span className="person-name">{a.name}</span>
-                <span className="person-seat">{seatLabel(a.seat, cols)}</span>
-                {hostData?.invites[a.memberId] && (
-                  <button
-                    className="icon-btn"
-                    aria-label={`Copy ${a.name}’s personal link`}
-                    data-tip="Copy personal link"
-                    onClick={async () => {
-                      const ok = await copyText(`${meetingUrl(state.id)}?invite=${hostData.invites[a.memberId]}`);
-                      toast(ok ? `Copied ${a.name}’s personal link.` : 'Couldn’t copy the link.', { tone: ok ? 'success' : 'warn' });
-                    }}
-                  >
-                    <Link2 size={15} />
-                  </button>
-                )}
-              </div>
-            ))}
+            {absent
+              .filter((a) => match(a.name))
+              .map((a) => (
+                <div className="person absent" key={a.memberId}>
+                  <Avatar name={a.name} colorKey={a.memberId} />
+                  <span className="person-name">{a.name}</span>
+                  <span className="person-seat">{seatLabel(a.seat, cols)}</span>
+                  {hostData?.invites[a.memberId] && (
+                    <button
+                      className="icon-btn"
+                      aria-label={`Copy ${a.name}’s personal link`}
+                      data-tip="Copy personal link"
+                      onClick={async () => {
+                        const ok = await copyText(`${meetingUrl(state.id)}?invite=${hostData.invites[a.memberId]}`);
+                        toast(ok ? `Copied ${a.name}’s personal link.` : 'Couldn’t copy the link.', { tone: ok ? 'success' : 'warn' });
+                      }}
+                    >
+                      <Link2 size={15} />
+                    </button>
+                  )}
+                </div>
+              ))}
           </section>
         )}
       </div>

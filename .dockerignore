@@ -1,0 +1,10 @@
+node_modules
+dist
+data
+data-test
+bin
+.env
+.git
+test-results
+playwright-report
+load-shots

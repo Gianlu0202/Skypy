@@ -65,6 +65,9 @@ async function download() {
   return target;
 }
 
+/** Local dev server: loopback only, quiet logs, well-known dev keys (devkey/secret). */
+export const LIVEKIT_DEV_ARGS = ['--dev', '--bind', '127.0.0.1', '--node-ip', '127.0.0.1', '--logging.level', 'warn'];
+
 export async function ensureLivekit() {
   const local = path.join(binDir, exe);
   if (fs.existsSync(local)) return local;
@@ -74,7 +77,7 @@ export async function ensureLivekit() {
 if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const binary = await ensureLivekit();
   console.log(`[livekit] starting ${binary} --dev (ws://localhost:7880, key "devkey", secret "secret")`);
-  const child = spawn(binary, ['--dev', '--bind', '127.0.0.1'], { stdio: 'inherit' });
+  const child = spawn(binary, LIVEKIT_DEV_ARGS, { stdio: 'inherit' });
   child.on('exit', (code) => process.exit(code ?? 0));
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => child.kill());
 }

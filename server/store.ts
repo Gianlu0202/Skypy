@@ -45,8 +45,7 @@ export function hashKey(key: string): string {
 /** Meet-style id, e.g. "kqz-hwtm-rfa". No vowels → no accidental words. */
 export function randomRoomId(): string {
   const alphabet = 'bcdfghjkmnpqrstvwxz';
-  const pick = (n: number) =>
-    Array.from(crypto.randomBytes(n), (b) => alphabet[b % alphabet.length]).join('');
+  const pick = (n: number) => Array.from(crypto.randomBytes(n), (b) => alphabet[b % alphabet.length]).join('');
   return `${pick(3)}-${pick(4)}-${pick(3)}`;
 }
 
@@ -89,11 +88,7 @@ function reviveRoom(raw: unknown): RoomRecord | null {
       lastSeen: typeof m.lastSeen === 'number' ? m.lastSeen : null,
     };
   }
-  const seats = sanitizeSeats(
-    Array.isArray(r.seats) ? r.seats : [],
-    settings.rows * settings.cols,
-    new Set(Object.keys(members)),
-  );
+  const seats = sanitizeSeats(Array.isArray(r.seats) ? r.seats : [], settings.rows * settings.cols, new Set(Object.keys(members)));
   return {
     v: 1,
     id: r.id,

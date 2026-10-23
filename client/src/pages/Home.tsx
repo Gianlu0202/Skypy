@@ -38,8 +38,8 @@ export function Home() {
               <span className="grad">Even while you share.</span>
             </h1>
             <p className="hero-lede">
-              Skypy seats everyone in a fixed spot — the same room for every participant, every time. When someone shares, the class
-              slides aside and the screen takes the middle. No one disappears into a hidden page.
+              Skypy seats everyone in a fixed spot — the same room for every participant, every time. When someone shares, the class slides
+              aside and the screen takes the middle. No one disappears into a hidden page.
             </p>
             <ul className="hero-points">
               <li>
@@ -284,7 +284,12 @@ function RoomsList() {
                 data-tip="Remove from this list"
                 aria-label="Remove from this list"
                 onClick={() => {
-                  if (!confirm(`Remove “${r.name}” from this device? The room keeps working, but you’ll need the host link to manage it again.`)) return;
+                  if (
+                    !confirm(
+                      `Remove “${r.name}” from this device? The room keeps working, but you’ll need the host link to manage it again.`,
+                    )
+                  )
+                    return;
                   forgetHostedRoom(r.id);
                   setRooms(hostedRooms());
                 }}

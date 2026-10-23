@@ -1,0 +1,7 @@
+dist
+node_modules
+data
+data-test
+bin
+package-lock.json
+*.md

@@ -157,6 +157,10 @@ app.post('/api/rooms/:id/peek', (req: Request, res: Response) => {
   res.json(roomInfo(room, parsed.success ? parsed.data : undefined));
 });
 
+app.get('/api/ping', (_req: Request, res: Response) => {
+  res.json({ ok: true });
+});
+
 app.get('/api/health', async (_req: Request, res: Response) => {
   const lk = await checkLivekit();
   res.status(lk.ok ? 200 : 503).json({ ok: lk.ok, livekit: lk });
@@ -170,10 +174,7 @@ app.use('/api', (_req: Request, res: Response) => {
 
 const indexHtml = path.join(config.clientDir, 'index.html');
 if (fs.existsSync(indexHtml)) {
-  app.use(
-    '/assets',
-    express.static(path.join(config.clientDir, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false }),
-  );
+  app.use('/assets', express.static(path.join(config.clientDir, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false }));
   app.use(express.static(config.clientDir, { index: false, maxAge: '1h' }));
   app.get(/^\/(?!api\/|ws$).*/, (_req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-cache');
@@ -183,7 +184,9 @@ if (fs.existsSync(indexHtml)) {
   app.get('/', (_req: Request, res: Response) => {
     res
       .type('text')
-      .send('Skypy API is running. In development open the Vite dev server (http://localhost:5173); for production run `npm run build` first.');
+      .send(
+        'Skypy API is running. In development open the Vite dev server (http://localhost:5173); for production run `npm run build` first.',
+      );
   });
 }
 
@@ -236,4 +239,3 @@ process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('unhandledRejection', (err) => console.error('[skypy] unhandled rejection:', err));
 process.on('uncaughtException', (err) => console.error('[skypy] uncaught exception:', err));
-

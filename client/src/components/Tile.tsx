@@ -80,7 +80,10 @@ export const Tile = memo(function Tile(props: TileProps) {
       }}
       onDoubleClick={() => {
         if (props.arrange || !session) return;
-        useStore.setState((s) => ({ pinned: s.pinned === session.id ? null : session.id, stageKey: s.pinned === session.id ? null : `pin:${session.id}` }));
+        useStore.setState((s) => ({
+          pinned: s.pinned === session.id ? null : session.id,
+          stageKey: s.pinned === session.id ? null : `pin:${session.id}`,
+        }));
       }}
     >
       {cam ? (
@@ -248,7 +251,14 @@ export interface EmptySeatProps {
 
 export const EmptySeat = memo(function EmptySeat(props: EmptySeatProps) {
   const { x, y, w, h, label, reservedName, reservedId, arrange, canManage } = props;
-  const cls = ['seat', reservedName && 'reserved', props.dropTarget && 'drop-target', props.dragging && 'is-dragging', arrange && canManage && 'editable', w < 110 && 'tiny']
+  const cls = [
+    'seat',
+    reservedName && 'reserved',
+    props.dropTarget && 'drop-target',
+    props.dragging && 'is-dragging',
+    arrange && canManage && 'editable',
+    w < 110 && 'tiny',
+  ]
     .filter(Boolean)
     .join(' ');
   return (

@@ -14,7 +14,13 @@ export function Toasts() {
       {toasts.map((t) => (
         <div key={t.id} className={`toast toast-${t.tone}`}>
           <span className="toast-icon">
-            {t.tone === 'success' ? <CircleCheck size={17} /> : t.tone === 'warn' || t.tone === 'error' ? <CircleAlert size={17} /> : <Info size={17} />}
+            {t.tone === 'success' ? (
+              <CircleCheck size={17} />
+            ) : t.tone === 'warn' || t.tone === 'error' ? (
+              <CircleAlert size={17} />
+            ) : (
+              <Info size={17} />
+            )}
           </span>
           <div className="toast-body">
             {t.title && <b>{t.title}</b>}
@@ -100,7 +106,14 @@ export function Dialog(props: { title: string; onClose: () => void; children: Re
   }, []);
   return (
     <div className="dialog-backdrop" onPointerDown={(e) => e.target === e.currentTarget && props.onClose()}>
-      <div className={`dialog${props.wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-label={props.title} ref={ref} tabIndex={-1}>
+      <div
+        className={`dialog${props.wide ? ' wide' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={props.title}
+        ref={ref}
+        tabIndex={-1}
+      >
         <header className="dialog-head">
           <h2>{props.title}</h2>
           <button className="icon-btn" onClick={props.onClose} aria-label="Close">
@@ -194,7 +207,12 @@ export function SettingsDialog({ meeting, onClose }: { meeting: Meeting; onClose
         <Volume2 size={15} /> Play test sound
       </button>
       <div className="dialog-sep" />
-      <Switch label="Mirror my video" hint="Only affects how you see yourself." checked={ui.mirror} onChange={(v) => setUi({ mirror: v })} />
+      <Switch
+        label="Mirror my video"
+        hint="Only affects how you see yourself."
+        checked={ui.mirror}
+        onChange={(v) => setUi({ mirror: v })}
+      />
       <Switch
         label="Show empty seats"
         hint="Keep every seat in place so faces never shift around."

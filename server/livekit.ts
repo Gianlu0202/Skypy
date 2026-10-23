@@ -8,12 +8,7 @@ function rooms(): RoomServiceClient {
   return client;
 }
 
-export async function createToken(opts: {
-  roomId: string;
-  identity: string;
-  name: string;
-  host: boolean;
-}): Promise<string> {
+export async function createToken(opts: { roomId: string; identity: string; name: string; host: boolean }): Promise<string> {
   const at = new AccessToken(config.livekit.apiKey, config.livekit.apiSecret, {
     identity: opts.identity,
     name: opts.name,

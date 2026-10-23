@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ensureLivekit } from './livekit.mjs';
+import { LIVEKIT_DEV_ARGS, ensureLivekit } from './livekit.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const prod = process.argv.includes('--prod');
@@ -64,7 +64,7 @@ process.on('SIGTERM', () => shutdown(0));
 if (!process.env.LIVEKIT_URL) {
   const binary = await ensureLivekit();
   // LiveKit is chatty at info level; only surface warnings and errors.
-  run('livekit', binary, ['--dev', '--bind', '127.0.0.1'], {
+  run('livekit', binary, LIVEKIT_DEV_ARGS, {
     filter: (line) => /WARN|ERROR|FATAL|panic|starting LiveKit/i.test(line) && !/CPU monitoring unsupported/.test(line),
   });
 } else {

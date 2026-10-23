@@ -128,12 +128,22 @@ export function Toolbar(props: { meeting: Meeting; onSettings: () => void; onSho
           <span className="tb-count">{state?.sessions.length ?? 0}</span>
           {host && handsUp > 0 && <span className="tb-badge hand">{handsUp}</span>}
         </button>
-        <button className={`tb-icon${panel === 'chat' ? ' on' : ''}`} onClick={() => setPanel('chat')} aria-label="Chat" data-tip="Chat · C">
+        <button
+          className={`tb-icon${panel === 'chat' ? ' on' : ''}`}
+          onClick={() => setPanel('chat')}
+          aria-label="Chat"
+          data-tip="Chat · C"
+        >
           <MessageSquare size={20} />
           {unread > 0 && <span className="tb-badge">{unread > 9 ? '9+' : unread}</span>}
         </button>
         {host && (
-          <button className={`tb-icon${panel === 'seats' ? ' on' : ''}`} onClick={() => setPanel('seats')} aria-label="Seating & room settings" data-tip="Seats & settings">
+          <button
+            className={`tb-icon${panel === 'seats' ? ' on' : ''}`}
+            onClick={() => setPanel('seats')}
+            aria-label="Seating & room settings"
+            data-tip="Seats & settings"
+          >
             <Armchair size={20} />
           </button>
         )}
@@ -198,7 +208,13 @@ function DeviceMenu(props: { meeting: Meeting; kinds: MediaDeviceKind[]; label: 
   const titles: Record<string, string> = { audioinput: 'Microphone', audiooutput: 'Speakers', videoinput: 'Camera' };
   return (
     <>
-      <button ref={anchor} className={`tb-caret${open ? ' open' : ''}`} onClick={() => setOpen((v) => !v)} aria-label={props.label} data-tip={props.label}>
+      <button
+        ref={anchor}
+        className={`tb-caret${open ? ' open' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-label={props.label}
+        data-tip={props.label}
+      >
         <ChevronUp size={14} />
       </button>
       <Popover anchor={anchor} open={open} onClose={() => setOpen(false)} placement="top" className="device-menu">
@@ -234,7 +250,13 @@ function ReactionPicker({ meeting }: { meeting: Meeting }) {
   const anchor = useRef<HTMLButtonElement>(null);
   return (
     <>
-      <button ref={anchor} className={`tb-btn${open ? ' active-soft' : ''}`} onClick={() => setOpen((v) => !v)} aria-label="Send a reaction" data-tip="React">
+      <button
+        ref={anchor}
+        className={`tb-btn${open ? ' active-soft' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Send a reaction"
+        data-tip="React"
+      >
         <Smile size={20} />
       </button>
       <Popover anchor={anchor} open={open} onClose={() => setOpen(false)} placement="top" className="reaction-menu">
@@ -271,7 +293,13 @@ function MoreMenu(props: { meeting: Meeting; onSettings: () => void; onShortcuts
   };
   return (
     <>
-      <button ref={anchor} className={`tb-btn${open ? ' active-soft' : ''}`} onClick={() => setOpen((v) => !v)} aria-label="More options" data-tip="More">
+      <button
+        ref={anchor}
+        className={`tb-btn${open ? ' active-soft' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-label="More options"
+        data-tip="More"
+      >
         <MoreVertical size={20} />
       </button>
       <Popover anchor={anchor} open={open} onClose={close} placement="top" className="more-menu">
@@ -283,9 +311,20 @@ function MoreMenu(props: { meeting: Meeting; onSettings: () => void; onShortcuts
           checked={ui.layout === 'room'}
           onClick={() => pick('room')}
         />
-        <MenuItem icon={<LayoutGrid size={16} />} label="Automatic" hint="Fit to my window" checked={ui.layout === 'auto'} onClick={() => pick('auto')} />
+        <MenuItem
+          icon={<LayoutGrid size={16} />}
+          label="Automatic"
+          hint="Fit to my window"
+          checked={ui.layout === 'auto'}
+          onClick={() => pick('auto')}
+        />
         <MenuItem icon={<Columns3 size={16} />} label="Faces on the sides" checked={ui.layout === 'sides'} onClick={() => pick('sides')} />
-        <MenuItem icon={<Rows3 size={16} />} label="Faces above & below" checked={ui.layout === 'stacked'} onClick={() => pick('stacked')} />
+        <MenuItem
+          icon={<Rows3 size={16} />}
+          label="Faces above & below"
+          checked={ui.layout === 'stacked'}
+          onClick={() => pick('stacked')}
+        />
         <MenuDivider />
         <MenuItem
           icon={<Grid3x3 size={16} />}
@@ -307,7 +346,11 @@ function MoreMenu(props: { meeting: Meeting; onSettings: () => void; onShortcuts
           />
         )}
         <MenuDivider />
-        <MenuItem icon={<Expand size={16} />} label={document.fullscreenElement ? 'Exit full screen' : 'Full screen'} onClick={() => void fullscreen()} />
+        <MenuItem
+          icon={<Expand size={16} />}
+          label={document.fullscreenElement ? 'Exit full screen' : 'Full screen'}
+          onClick={() => void fullscreen()}
+        />
         <MenuItem
           icon={<Settings size={16} />}
           label="Settings"

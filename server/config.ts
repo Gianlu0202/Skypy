@@ -1,7 +1,22 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+
+/** The built client: dist/client next to the bundled server, or from source. */
+function findClientDir(): string {
+  const candidates = [path.join(here, '..', 'client'), path.join(here, '..', 'dist', 'client')];
+  for (const dir of candidates) {
+    try {
+      const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+      if (!html.includes('/src/main.tsx')) return dir; // skip the unbuilt Vite entry
+    } catch {
+      /* not here */
+    }
+  }
+  return candidates[candidates.length - 1];
+}
 
 function env(name: string): string | undefined {
   const v = process.env[name];
@@ -20,7 +35,7 @@ export const config = {
   host: env('HOST') ?? '0.0.0.0',
   dataDir: path.resolve(env('DATA_DIR') ?? path.join(process.cwd(), 'data')),
   /** Built client bundle; present after `npm run build`. */
-  clientDir: path.resolve(env('CLIENT_DIR') ?? path.join(here, '..', 'client')),
+  clientDir: path.resolve(env('CLIENT_DIR') ?? findClientDir()),
   trustProxy: env('TRUST_PROXY') ?? 'loopback, linklocal, uniquelocal',
   livekit: {
     /** URL browsers connect to (wss:// in production). */

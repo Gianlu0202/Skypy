@@ -1,0 +1,26 @@
+# Render Blueprint: one-click deploy of the Skypy app (pair it with a free
+# LiveKit Cloud project for media). Fill in the three LIVEKIT_* values when
+# Render asks for them.
+services:
+  - type: web
+    name: skypy
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/ping
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATA_DIR
+        value: /var/data
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+    disk:
+      name: skypy-data
+      mountPath: /var/data
+      sizeGB: 1

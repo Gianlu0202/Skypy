@@ -98,12 +98,7 @@ export function claimSeats(seats: (string | null)[], sessions: Occupant[]): bool
  * the member's previous seat (or, if the member had no reservation, the seat
  * they were sitting in, when that one is unreserved).
  */
-export function assignSeat(
-  seats: (string | null)[],
-  sessions: readonly Occupant[],
-  memberId: string,
-  target: number,
-): boolean {
+export function assignSeat(seats: (string | null)[], sessions: readonly Occupant[], memberId: string, target: number): boolean {
   if (target < 0 || target >= seats.length) return false;
   const from = seats.indexOf(memberId);
   if (from === target) return false;

@@ -47,7 +47,11 @@ class RoomRuntime {
 }
 
 const token = z.string().regex(/^[A-Za-z0-9_-]{6,64}$/);
-const seatIndex = z.number().int().min(0).max(LIMITS.maxSeats - 1);
+const seatIndex = z
+  .number()
+  .int()
+  .min(0)
+  .max(LIMITS.maxSeats - 1);
 const shortText = z.string().max(LIMITS.nameLength * 2);
 
 const helloSchema = z.object({
@@ -82,7 +86,10 @@ const msgSchema = z.discriminatedUnion('t', [
   z.object({
     t: z.literal('settings'),
     patch: z.object({
-      name: z.string().max(LIMITS.roomNameLength * 2).optional(),
+      name: z
+        .string()
+        .max(LIMITS.roomNameLength * 2)
+        .optional(),
       rows: z.number().int().min(LIMITS.minRows).max(LIMITS.maxRows).optional(),
       cols: z.number().int().min(LIMITS.minCols).max(LIMITS.maxCols).optional(),
       layout: z.enum(['auto', 'sides', 'stacked']).optional(),
@@ -229,7 +236,11 @@ export class Hub {
 
     const member = this.resolveMember(rt, { name, deviceKey: msg.deviceKey, invite: msg.invite });
     if (!member && room.settings.locked && !owner) {
-      return this.deny(ws, 'locked', 'This meeting is locked. Only people on the seating roster can join — ask the host for your personal link.');
+      return this.deny(
+        ws,
+        'locked',
+        'This meeting is locked. Only people on the seating roster can join — ask the host for your personal link.',
+      );
     }
     if (member && rt.removed.has(member.id) && !owner) {
       return this.deny(ws, 'removed', 'The host removed you from this meeting.');
@@ -328,9 +339,7 @@ export class Hub {
       if (byInvite) return byInvite;
     }
     const deviceHash = hashKey(who.deviceKey);
-    const byDevice = members
-      .filter((m) => m.devices.includes(deviceHash))
-      .sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))[0];
+    const byDevice = members.filter((m) => m.devices.includes(deviceHash)).sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))[0];
     if (byDevice) return byDevice;
     const norm = normalizeName(who.name);
     const online = new Set([...rt.sessions.values()].map((s) => s.memberId));

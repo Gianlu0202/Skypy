@@ -391,7 +391,9 @@ textarea::placeholder {
 .segmented button.on {
   background: var(--surface-4);
   color: var(--text);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .segmented.small button {
@@ -801,8 +803,7 @@ textarea::placeholder {
   flex-direction: column;
   background:
     radial-gradient(1200px 600px at 85% -10%, rgba(124, 108, 255, 0.16), transparent 60%),
-    radial-gradient(900px 500px at -10% 10%, rgba(79, 156, 255, 0.13), transparent 60%),
-    var(--bg);
+    radial-gradient(900px 500px at -10% 10%, rgba(79, 156, 255, 0.13), transparent 60%), var(--bg);
 }
 
 .home-nav {
@@ -1967,16 +1968,40 @@ textarea::placeholder {
   cursor: grab;
 }
 
-/* Stage */
+/* Stage: the outer box is the space the layout reserves; the frame inside
+   hugs the shared content's shape and stays centred in it. */
 .stage {
+  display: grid;
+  place-items: center;
+  animation: stage-in 520ms var(--ease-out);
+  z-index: 1;
+}
+
+.stage-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   border-radius: 16px;
   overflow: hidden;
   background: #000;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.06),
     0 20px 60px rgba(0, 0, 0, 0.5);
-  animation: stage-in 520ms var(--ease-out);
-  z-index: 1;
+  transition:
+    width var(--tile-move) var(--ease),
+    height var(--tile-move) var(--ease);
+}
+
+.canvas.resizing .stage-frame {
+  transition: none;
+}
+
+.stage-frame:fullscreen {
+  border-radius: 0;
+  width: 100%;
+  height: 100%;
 }
 
 @keyframes stage-in {
@@ -2144,17 +2169,13 @@ textarea::placeholder {
   transition: opacity 140ms ease;
 }
 
-.stage:hover .stage-btn,
+.stage-frame:hover .stage-btn,
 .stage-btn:focus-visible {
   opacity: 1;
 }
 
 .stage-btn:hover {
   color: var(--text);
-}
-
-.stage:fullscreen {
-  border-radius: 0;
 }
 
 /* Resize handles between faces and the stage */

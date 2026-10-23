@@ -1,0 +1,14 @@
+# One domain for everything: LiveKit signalling lives under /rtc, the app
+# (pages, API and its WebSocket) under everything else. HTTPS is automatic.
+{$DOMAIN} {
+	encode zstd gzip
+
+	@livekit path /rtc /rtc/*
+	handle @livekit {
+		reverse_proxy 127.0.0.1:7880
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}

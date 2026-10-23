@@ -7,14 +7,24 @@ export function Stepper(props: { label: string; value: number; min: number; max:
   const { label, value, min, max, onChange } = props;
   return (
     <div className="stepper" role="group" aria-label={label}>
-      <button type="button" aria-label={`Fewer ${label.toLowerCase()}`} disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))}>
+      <button
+        type="button"
+        aria-label={`Fewer ${label.toLowerCase()}`}
+        disabled={value <= min}
+        onClick={() => onChange(Math.max(min, value - 1))}
+      >
         <Minus size={14} />
       </button>
       <span className="stepper-value">
         <b>{value}</b>
         <small>{label}</small>
       </span>
-      <button type="button" aria-label={`More ${label.toLowerCase()}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>
+      <button
+        type="button"
+        aria-label={`More ${label.toLowerCase()}`}
+        disabled={value >= max}
+        onClick={() => onChange(Math.min(max, value + 1))}
+      >
         <Plus size={14} />
       </button>
     </div>

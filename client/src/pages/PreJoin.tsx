@@ -3,7 +3,6 @@ import {
   createAudioAnalyser,
   createLocalAudioTrack,
   createLocalVideoTrack,
-  VideoPresets,
   type LocalAudioTrack,
   type LocalVideoTrack,
 } from 'livekit-client';
@@ -11,7 +10,7 @@ import { ArrowRight, Check, Copy, Crown, Mic, MicOff, Video, VideoOff, Volume2, 
 import { LIMITS, seatLabel, type RoomInfo } from '../../../shared/protocol.ts';
 import { Logo } from '../components/Logo.tsx';
 import { Avatar, VideoTrackView } from '../components/Media.tsx';
-import { describeMediaError, type JoinOptions } from '../lib/meeting.ts';
+import { CAMERA_RESOLUTION, describeMediaError, type JoinOptions } from '../lib/meeting.ts';
 import { copyText, meetingUrl, plural } from '../lib/format.ts';
 import { navigate } from '../lib/router.ts';
 import { deviceKey, mediaPrefs, saveMediaPrefs, saveName, savedName } from '../lib/storage.ts';
@@ -33,10 +32,10 @@ async function listDevices(): Promise<Devices> {
 
 async function openCamera(deviceId?: string): Promise<LocalVideoTrack> {
   try {
-    return await createLocalVideoTrack({ deviceId, resolution: VideoPresets.h720.resolution });
+    return await createLocalVideoTrack({ deviceId, resolution: CAMERA_RESOLUTION });
   } catch (err) {
     // The remembered device may be gone — fall back to the default one.
-    if (deviceId) return createLocalVideoTrack({ resolution: VideoPresets.h720.resolution });
+    if (deviceId) return createLocalVideoTrack({ resolution: CAMERA_RESOLUTION });
     throw err;
   }
 }
@@ -116,7 +115,11 @@ export function MicMeter({ track }: { track: LocalAudioTrack | null }) {
   );
 }
 
-export function PreJoin(props: { info: RoomInfo; hostKey?: string; onJoin: (opts: Omit<JoinOptions, 'roomId' | 'hostKey' | 'invite'>) => void }) {
+export function PreJoin(props: {
+  info: RoomInfo;
+  hostKey?: string;
+  onJoin: (opts: Omit<JoinOptions, 'roomId' | 'hostKey' | 'invite'>) => void;
+}) {
   const { info, onJoin } = props;
   const prefs = useRef(mediaPrefs()).current;
   const [name, setName] = useState(() => info.you?.name || savedName());
@@ -301,7 +304,12 @@ export function PreJoin(props: { info: RoomInfo; hostKey?: string; onJoin: (opts
           <div className="device-row">
             <label className="device-select">
               <Video size={15} />
-              <select value={camId} onChange={(e) => void pickCamera(e.target.value)} disabled={devices.videoinput.length === 0} aria-label="Camera">
+              <select
+                value={camId}
+                onChange={(e) => void pickCamera(e.target.value)}
+                disabled={devices.videoinput.length === 0}
+                aria-label="Camera"
+              >
                 {devices.videoinput.length === 0 && <option value="">No camera</option>}
                 {devices.videoinput.map((d, i) => (
                   <option key={d.deviceId} value={d.deviceId}>
@@ -312,7 +320,12 @@ export function PreJoin(props: { info: RoomInfo; hostKey?: string; onJoin: (opts
             </label>
             <label className="device-select">
               <Mic size={15} />
-              <select value={micId} onChange={(e) => void pickMic(e.target.value)} disabled={devices.audioinput.length === 0} aria-label="Microphone">
+              <select
+                value={micId}
+                onChange={(e) => void pickMic(e.target.value)}
+                disabled={devices.audioinput.length === 0}
+                aria-label="Microphone"
+              >
                 {devices.audioinput.length === 0 && <option value="">No microphone</option>}
                 {devices.audioinput.map((d, i) => (
                   <option key={d.deviceId} value={d.deviceId}>
