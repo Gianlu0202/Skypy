@@ -232,16 +232,19 @@ npm run test:e2e     # end-to-end: real browsers with fake cameras (builds first
 npm run typecheck
 ```
 
-The end-to-end suite covers returning to your seat, name matching, class lists and
-personal links, drag-to-reseat, locked rooms, screen sharing geometry, spotlight, chat,
-hands, reactions, mute/remove, co-hosts, page reloads and dropped connections.
+The end-to-end suite (18 scenarios, real browsers with fake cameras) covers returning to
+your seat, name matching, class lists and personal links, drag-to-reseat, locked rooms,
+screen-sharing geometry, spotlight, chat, hands, reactions, mute/remove (including a
+removed person changing their name), co-hosts and the host key, spoofed connections,
+page reloads, dropped and vanished connections, and joining before the camera is ready.
 
-Load test with a full class (one host browser + 39 simulated students, each with its own
-synthetic camera):
+Heavier checks, run against `npm run local` in another terminal:
 
 ```bash
-npm run build && node scripts/dev.mjs --prod      # in one terminal
-node tests/load/classroom.mjs --people 40         # in another
+node tests/load/classroom.mjs --people 40   # a full class: every face playing, in its seat, while someone presents
+node tests/load/soak.mjs --minutes 4        # 10 people doing random things (mute, share, reload, drop Wi-Fi…)
+node tests/visual/ui-tour.mjs shots         # screenshots of panels, menus and the phone layout
+node tests/visual/firefox-check.mjs ff.png  # Chrome and Firefox in the same meeting
 ```
 
 ## Configuration
