@@ -109,3 +109,14 @@ describe('computeLayout', () => {
     expect(r.length).toBe(4);
   });
 });
+
+describe('balanced bands', () => {
+  it('splits the back rows evenly instead of leaving a short last row', () => {
+    const out = computeLayout({ ...base, width: 1900, height: 980, items: seats(5, 8), stage: true, mode: 'stacked' });
+    const bottom = [...out.tiles.entries()].filter(([, r]) => r.y > out.stage!.y + out.stage!.h);
+    const rows = new Map<number, number>();
+    for (const [, r] of bottom) rows.set(r.y, (rows.get(r.y) ?? 0) + 1);
+    const counts = [...rows.values()];
+    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
+  });
+});

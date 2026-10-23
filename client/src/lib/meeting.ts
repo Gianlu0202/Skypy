@@ -54,7 +54,14 @@ export function currentMeeting(): Meeting | null {
   return current;
 }
 
-const DEVICE_ERRORS = new Set(['NotAllowedError', 'SecurityError', 'NotFoundError', 'OverconstrainedError', 'NotReadableError', 'AbortError']);
+const DEVICE_ERRORS = new Set([
+  'NotAllowedError',
+  'SecurityError',
+  'NotFoundError',
+  'OverconstrainedError',
+  'NotReadableError',
+  'AbortError',
+]);
 
 function isDeviceError(err: unknown): boolean {
   return DEVICE_ERRORS.has((err as { name?: string })?.name ?? '');
@@ -116,7 +123,10 @@ export class Meeting {
 
     const prefs = mediaPrefs();
     this.room = new Room({
-      adaptiveStream: true,
+      // Each tile receives only the resolution it needs. Density 1 (not the
+      // screen's 2x) keeps a 40-face class to a few Mbps on high-DPI laptops;
+      // big views (shared screen, spotlight) still get HD.
+      adaptiveStream: { pixelDensity: 1 },
       dynacast: true,
       disconnectOnPageLeave: true,
       videoCaptureDefaults: { resolution: CAMERA_RESOLUTION, deviceId: prefs.camId },
@@ -252,7 +262,8 @@ export class Meeting {
       if (host) {
         const prevHands = new Set(prev.state.sessions.filter((s) => s.hand).map((s) => s.id));
         for (const s of next.sessions) {
-          if (s.hand && !prevHands.has(s.id) && s.id !== me) toast(`${s.name} raised a hand`, { title: 'Hand raised', icon: 'hand', ttl: 6000 });
+          if (s.hand && !prevHands.has(s.id) && s.id !== me)
+            toast(`${s.name} raised a hand`, { title: 'Hand raised', icon: 'hand', ttl: 6000 });
         }
       }
     }

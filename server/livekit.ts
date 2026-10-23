@@ -65,11 +65,7 @@ export async function muteMicrophone(roomId: string, identity: string): Promise<
 /** Disconnect someone from media; with `revoke`, their existing tokens stop working. */
 export async function removeParticipant(roomId: string, identity: string, opts: { revoke?: boolean } = {}): Promise<void> {
   try {
-    await rooms().removeParticipant(
-      roomId,
-      identity,
-      opts.revoke ? { revokeTokenTs: BigInt(Math.floor(Date.now() / 1000)) } : undefined,
-    );
+    await rooms().removeParticipant(roomId, identity, opts.revoke ? { revokeTokenTs: BigInt(Math.floor(Date.now() / 1000)) } : undefined);
   } catch (err) {
     // Not connected to media (yet) — nothing to remove.
     console.warn(`[livekit] remove ${identity}:`, (err as Error).message);

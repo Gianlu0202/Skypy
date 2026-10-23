@@ -50,6 +50,8 @@ export const config = {
   graceSeconds: Number(env('SEAT_GRACE_SECONDS') ?? 30),
   /** Max rooms created per IP per hour. */
   createLimit: Number(env('ROOM_CREATE_LIMIT') ?? 30),
+  /** If set, starting a meeting requires this access code (joining never does). */
+  createCode: env('CREATE_CODE') ?? null,
 };
 
 export function assertConfig(): void {

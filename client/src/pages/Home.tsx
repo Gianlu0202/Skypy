@@ -4,10 +4,10 @@ import { LIMITS } from '../../../shared/protocol.ts';
 import { HeroDemo } from '../components/HeroDemo.tsx';
 import { Logo } from '../components/Logo.tsx';
 import { Stepper } from '../components/Controls.tsx';
-import { createRoom } from '../lib/api.ts';
+import { createRoom, getConfig } from '../lib/api.ts';
 import { copyText, meetingUrl } from '../lib/format.ts';
 import { navigate, parseRoomInput } from '../lib/router.ts';
-import { forgetHostedRoom, hostedRooms, rememberHostedRoom, type HostedRoom } from '../lib/storage.ts';
+import { forgetHostedRoom, hostedRooms, rememberHostedRoom, saveCreateCode, savedCreateCode, type HostedRoom } from '../lib/storage.ts';
 
 const PRESETS = [
   { id: 'small', label: '20 seats', rows: 4, cols: 5 },
@@ -91,6 +91,18 @@ function CreateCard() {
   const [slug, setSlug] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsCode, setNeedsCode] = useState(false);
+  const [code, setCode] = useState(() => savedCreateCode());
+
+  useEffect(() => {
+    let cancelled = false;
+    getConfig()
+      .then((c) => !cancelled && setNeedsCode(c.createNeedsCode))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const chosen = PRESETS.find((p) => p.id === preset)!;
   const r = preset === 'custom' ? rows : chosen.rows;
@@ -104,7 +116,14 @@ function CreateCard() {
     setError(null);
     try {
       const title = name.trim() || 'Untitled meeting';
-      const res = await createRoom({ name: title, rows: r, cols: c, slug: customLink && slug.trim() ? slug.trim() : undefined });
+      const res = await createRoom({
+        name: title,
+        rows: r,
+        cols: c,
+        slug: customLink && slug.trim() ? slug.trim() : undefined,
+        code: needsCode ? code.trim() : undefined,
+      });
+      if (needsCode) saveCreateCode(code.trim());
       rememberHostedRoom({ id: res.id, name: title, hostKey: res.hostKey });
       navigate(`/r/${res.id}`);
     } catch (err) {
@@ -188,9 +207,24 @@ function CreateCard() {
         </button>
       )}
 
+      {needsCode && (
+        <label className="field">
+          <span className="field-label">Access code</span>
+          <input
+            className="input"
+            type="password"
+            value={code}
+            autoComplete="off"
+            placeholder="Ask whoever runs this Skypy"
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <span className="field-hint">Only needed to start meetings. Joining with a link never needs it.</span>
+        </label>
+      )}
+
       {error && <p className="form-error">{error}</p>}
 
-      <button className="btn btn-primary btn-lg" type="submit" disabled={busy || tooMany}>
+      <button className="btn btn-primary btn-lg" type="submit" disabled={busy || tooMany || (needsCode && !code.trim())}>
         {busy ? 'Creating…' : 'Create meeting'}
         <ArrowRight size={18} />
       </button>

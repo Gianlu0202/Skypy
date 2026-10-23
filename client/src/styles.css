@@ -2326,6 +2326,40 @@ textarea::placeholder {
   color: var(--text);
 }
 
+.alone-card {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: calc(100% - 24px);
+  padding: 10px 10px 10px 18px;
+  border-radius: 16px;
+  background: rgba(22, 27, 37, 0.95);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  animation: toast-in 400ms var(--ease-out) 600ms both;
+}
+
+.alone-card div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.alone-card b {
+  font-size: 14px;
+}
+
+.alone-card span {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
 .seat-editor {
   width: 300px;
 }

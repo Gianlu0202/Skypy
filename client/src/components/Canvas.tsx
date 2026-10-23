@@ -2,9 +2,11 @@
 // the layout engine, and handles drag-to-reseat and resizing the face columns.
 import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { RoomEvent, type Participant } from 'livekit-client';
+import { Check, Link2 } from 'lucide-react';
 import { seatLabel, type SessionView } from '../../../shared/protocol.ts';
 import { hasScreenShare, useRoomEvents, useSize } from '../lib/hooks.ts';
 import { autoMode, clamp, computeLayout, PAD, SPLIT_MAX, SPLIT_MIN, type LayoutItem, type Rect, type StageMode } from '../lib/layout.ts';
+import { copyText, meetingUrl } from '../lib/format.ts';
 import type { Meeting } from '../lib/meeting.ts';
 import { setUi, useStore } from '../lib/store.ts';
 import { Avatar } from './Media.tsx';
@@ -60,6 +62,10 @@ export function Canvas({ meeting }: { meeting: Meeting }) {
   if (room.localParticipant.identity) participants.set(room.localParticipant.identity, room.localParticipant);
 
   const sessions = new Map(state.sessions.map((s) => [s.id, s]));
+  // Last seat we saw each person in. If the server briefly loses track of
+  // someone who is still connected (e.g. it restarted), they stay put.
+  const lastSeen = useRef(new Map<string, SessionView>());
+  for (const s of state.sessions) lastSeen.current.set(s.id, s);
   const members = new Map(state.members.map((m) => [m.id, m]));
   const bySeat = new Map<number, SessionView>();
   const overflow: { id: string; session?: SessionView }[] = [];
@@ -67,9 +73,17 @@ export function Canvas({ meeting }: { meeting: Meeting }) {
     if (s.seat !== null && s.seat < cap) bySeat.set(s.seat, s);
     else overflow.push({ id: s.id, session: s });
   }
-  // Media-connected people the server doesn't list (brief races): never hide anyone.
+  // Media-connected people the server doesn't list right now: keep them in
+  // their last seat if it's free, otherwise show them as extras. Never hide anyone.
   for (const identity of participants.keys()) {
-    if (!sessions.has(identity) && identity !== sessionId) overflow.push({ id: identity });
+    if (sessions.has(identity) || identity === sessionId) continue;
+    const last = lastSeen.current.get(identity);
+    if (last && last.seat !== null && last.seat < cap && !bySeat.has(last.seat)) {
+      bySeat.set(last.seat, last);
+      sessions.set(identity, last);
+    } else {
+      overflow.push({ id: identity });
+    }
   }
   const hands = state.sessions
     .filter((s) => s.hand)
@@ -317,6 +331,8 @@ export function Canvas({ meeting }: { meeting: Meeting }) {
         </div>
       )}
 
+      {state.sessions.length === 1 && !active && !arrange && <AloneCard roomId={state.id} />}
+
       {arrange && (
         <div className="arrange-banner">
           <span>
@@ -342,6 +358,31 @@ export function Canvas({ meeting }: { meeting: Meeting }) {
           onClose={() => setEditing(null)}
         />
       )}
+    </div>
+  );
+}
+
+/** Shown while you're the only one here: invite people right away. */
+function AloneCard({ roomId }: { roomId: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="alone-card">
+      <div>
+        <b>You’re the first one here</b>
+        <span>Share the link so others can join.</span>
+      </div>
+      <button
+        className="btn btn-primary btn-small"
+        onClick={async () => {
+          if (await copyText(meetingUrl(roomId))) {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1800);
+          }
+        }}
+      >
+        {copied ? <Check size={15} /> : <Link2 size={15} />}
+        {copied ? 'Copied' : 'Copy invite link'}
+      </button>
     </div>
   );
 }

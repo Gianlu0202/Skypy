@@ -164,6 +164,8 @@ export class Hub {
     const record = this.store.get(roomId);
     if (!record) return undefined;
     rt = new RoomRuntime(record);
+    // After a restart, a meeting that was running a moment ago keeps its clock.
+    if (record.liveSince && Date.now() - record.updatedAt < 5 * 60_000) rt.startedAt = record.liveSince;
     this.runtimes.set(roomId, rt);
     return rt;
   }
@@ -328,6 +330,7 @@ export class Hub {
       rt.idleTimer = null;
     }
     rt.startedAt ??= Date.now();
+    room.liveSince = rt.startedAt;
 
     this.reseat(rt);
     this.store.save(room.id);
@@ -456,6 +459,8 @@ export class Hub {
 
   private scheduleIdle(rt: RoomRuntime): void {
     rt.startedAt = null;
+    rt.record.liveSince = null;
+    this.store.save(rt.record.id);
     rt.removed.clear();
     rt.spotlight = null;
     if (rt.idleTimer) clearTimeout(rt.idleTimer);

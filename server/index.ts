@@ -1,11 +1,12 @@
 import './env.ts';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { WebSocketServer } from 'ws';
 import { z } from 'zod';
-import { LIMITS, cleanName, type CreateRoomResponse, type RoomInfo } from '../shared/protocol.ts';
+import { LIMITS, cleanName, type CreateRoomResponse, type RoomInfo, type ServerConfig } from '../shared/protocol.ts';
 import { assertConfig, config } from './config.ts';
 import { Hub } from './hub.ts';
 import { checkLivekit } from './livekit.ts';
@@ -20,7 +21,23 @@ app.disable('x-powered-by');
 app.set('trust proxy', config.trustProxy);
 app.use(express.json({ limit: '32kb' }));
 
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "media-src 'self' blob: mediastream:",
+  "font-src 'self' data:",
+  // LiveKit signalling (wss) and LiveKit Cloud region discovery (https).
+  "connect-src 'self' ws: wss: https:",
+  "worker-src 'self' blob:",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
+
 app.use((_req, res, next) => {
+  res.setHeader('Content-Security-Policy', CSP);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -46,6 +63,21 @@ const createSchema = z.object({
   rows: z.number().int().min(LIMITS.minRows).max(LIMITS.maxRows),
   cols: z.number().int().min(LIMITS.minCols).max(LIMITS.maxCols),
   slug: z.string().max(80).optional(),
+  code: z.string().max(200).optional(),
+});
+
+function codeMatches(given: string | undefined): boolean {
+  if (!config.createCode) return true;
+  const a = crypto
+    .createHash('sha256')
+    .update(given ?? '')
+    .digest();
+  const b = crypto.createHash('sha256').update(config.createCode).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+app.get('/api/config', (_req: Request, res: Response) => {
+  res.json({ createNeedsCode: !!config.createCode } satisfies ServerConfig);
 });
 
 function slugify(input: string): string {
@@ -67,6 +99,10 @@ app.post('/api/rooms', (req: Request, res: Response) => {
   }
   if (rateLimited(req.ip ?? 'unknown')) {
     res.status(429).json({ error: 'Too many meetings created. Try again later.' });
+    return;
+  }
+  if (!codeMatches(parsed.data.code)) {
+    res.status(403).json({ error: 'That access code isn’t right.' });
     return;
   }
   const { rows, cols } = parsed.data;
@@ -173,12 +209,38 @@ app.use('/api', (_req: Request, res: Response) => {
 // ───────────────────────── client ─────────────────────────
 
 const indexHtml = path.join(config.clientDir, 'index.html');
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}
+
+/** index.html with a title and link-preview tags for the page being opened. */
+function pageHtml(template: string, req: Request): string {
+  const m = /^\/r\/([a-z0-9-]{3,40})\/?$/i.exec(req.path);
+  const room = m ? store.get(m[1].toLowerCase()) : undefined;
+  const title = room ? `${room.name} · Skypy` : 'Skypy — every face, every seat';
+  const description = room
+    ? 'Join the meeting on Skypy — your seat is waiting. Works in your browser, nothing to install.'
+    : 'Group video meetings where everyone keeps their seat. Every face stays on screen, even while you share.';
+  const origin = `${req.protocol}://${req.get('host') ?? 'localhost'}`;
+  const tags = [
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:site_name" content="Skypy" />`,
+    `<meta property="og:title" content="${escapeHtml(title)}" />`,
+    `<meta property="og:description" content="${escapeHtml(description)}" />`,
+    `<meta property="og:image" content="${escapeHtml(origin)}/og.png" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+  ].join('\n    ');
+  return template.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(title)}</title>\n    ${tags}`);
+}
+
 if (fs.existsSync(indexHtml)) {
+  const template = fs.readFileSync(indexHtml, 'utf8');
   app.use('/assets', express.static(path.join(config.clientDir, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false }));
   app.use(express.static(config.clientDir, { index: false, maxAge: '1h' }));
-  app.get(/^\/(?!api\/|ws$).*/, (_req: Request, res: Response) => {
+  app.get(/^\/(?!api\/|ws$).*/, (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(indexHtml);
+    res.type('html').send(pageHtml(template, req));
   });
 } else {
   app.get('/', (_req: Request, res: Response) => {

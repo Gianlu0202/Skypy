@@ -1,4 +1,4 @@
-import type { CreateRoomRequest, CreateRoomResponse, RoomInfo } from '../../../shared/protocol.ts';
+import type { CreateRoomRequest, CreateRoomResponse, RoomInfo, ServerConfig } from '../../../shared/protocol.ts';
 
 export class ApiError extends Error {
   constructor(
@@ -40,6 +40,6 @@ export function peekRoom(id: string, who: { deviceKey: string; invite?: string; 
   return request(`/api/rooms/${encodeURIComponent(id)}/peek`, { method: 'POST', body: JSON.stringify(who) });
 }
 
-export function roomExists(id: string): Promise<RoomInfo> {
-  return request(`/api/rooms/${encodeURIComponent(id)}`);
+export function getConfig(): Promise<ServerConfig> {
+  return request('/api/config');
 }

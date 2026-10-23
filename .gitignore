@@ -8,3 +8,5 @@ playwright-report/
 *.log
 .DS_Store
 data-test/
+ui-shots/
+load-shots/

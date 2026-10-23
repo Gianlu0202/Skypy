@@ -30,6 +30,8 @@ export interface RoomRecord {
   settings: RoomSettings;
   seats: (string | null)[];
   members: Record<string, MemberRecord>;
+  /** When the current meeting started (null when nobody is in the room). */
+  liveSince?: number | null;
 }
 
 export const ROOM_ID_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
@@ -99,6 +101,7 @@ function reviveRoom(raw: unknown): RoomRecord | null {
     settings,
     seats,
     members,
+    liveSince: typeof r.liveSince === 'number' ? r.liveSince : null,
   };
 }
 

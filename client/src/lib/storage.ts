@@ -138,6 +138,15 @@ export function saveInvite(roomId: string, token: string): void {
   write(local, 'skypy.invites', all);
 }
 
+/** Access code for starting meetings, when the server requires one. */
+export function savedCreateCode(): string {
+  return read<string>(local, 'skypy.createCode', '');
+}
+
+export function saveCreateCode(code: string): void {
+  write(local, 'skypy.createCode', code);
+}
+
 // ───────────── preferences ─────────────
 
 export interface MediaPrefs {

@@ -168,6 +168,13 @@ export interface CreateRoomRequest {
   rows: number;
   cols: number;
   slug?: string;
+  /** Required when the server sets CREATE_CODE. */
+  code?: string;
+}
+
+export interface ServerConfig {
+  /** Starting a meeting needs an access code (CREATE_CODE is set). */
+  createNeedsCode: boolean;
 }
 
 export interface CreateRoomResponse {

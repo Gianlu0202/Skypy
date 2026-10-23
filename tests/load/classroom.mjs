@@ -72,6 +72,79 @@ function fakeCamera({ name, hue, lite }) {
     for (const track of canvas.captureStream(15).getVideoTracks()) stream.addTrack(track);
     return stream;
   };
+  // Screen sharing shows a lecture slide instead of Chrome's test pattern.
+  navigator.mediaDevices.getDisplayMedia = async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    const c = canvas.getContext('2d');
+    let t = 0;
+    const draw = () => {
+      t += 1;
+      c.fillStyle = '#ffffff';
+      c.fillRect(0, 0, 1280, 720);
+      c.fillStyle = '#8c1515';
+      c.fillRect(0, 0, 1280, 10);
+      c.fillStyle = '#1f2430';
+      c.font = '600 46px Segoe UI, Arial, sans-serif';
+      c.fillText('Gradient descent, intuitively', 80, 120);
+      c.fillStyle = '#5b6474';
+      c.font = '26px Segoe UI, Arial, sans-serif';
+      c.fillText('Lecture 7 · Optimization', 80, 165);
+      c.fillStyle = '#1f2430';
+      c.font = '28px Segoe UI, Arial, sans-serif';
+      const bullets = [
+        'Follow the negative gradient downhill',
+        'Step size η trades speed for stability',
+        'Too large: overshoot. Too small: crawl',
+        'Mini-batches add helpful noise',
+      ];
+      bullets.forEach((b, i) => {
+        c.beginPath();
+        c.arc(92, 258 + i * 70, 6, 0, Math.PI * 2);
+        c.fill();
+        c.fillText(b, 115, 268 + i * 70);
+      });
+      // loss curve
+      const ox = 760,
+        oy = 600,
+        w = 440,
+        h = 360;
+      c.strokeStyle = '#c9cfdc';
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(ox, oy - h);
+      c.lineTo(ox, oy);
+      c.lineTo(ox + w, oy);
+      c.stroke();
+      c.strokeStyle = '#4f7cff';
+      c.lineWidth = 5;
+      c.beginPath();
+      for (let x = 0; x <= w; x += 4) {
+        const y = h * 0.9 * Math.exp(-x / 110) + 18 + Math.sin(x / 9) * 4;
+        if (x === 0) c.moveTo(ox + x, oy - y);
+        else c.lineTo(ox + x, oy - y);
+      }
+      c.stroke();
+      c.fillStyle = '#5b6474';
+      c.font = '22px Segoe UI, Arial, sans-serif';
+      c.fillText('training loss', ox + w - 140, oy - h + 20);
+      c.fillText('steps →', ox + w - 80, oy + 34);
+      // laser pointer
+      const px = ox + 60 + ((t * 6) % 360);
+      const py = oy - (h * 0.9 * Math.exp(-(px - ox) / 110) + 18);
+      c.fillStyle = 'rgba(229, 72, 77, 0.85)';
+      c.beginPath();
+      c.arc(px, py, 9, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#9aa2b1';
+      c.font = '20px Segoe UI, Arial, sans-serif';
+      c.fillText('CS 229 · Thursday Seminar', 80, 680);
+    };
+    draw();
+    setInterval(draw, 1000 / 10);
+    return canvas.captureStream(10);
+  };
   if (lite) {
     // Simulated students don't need to paint video.
     document.addEventListener('DOMContentLoaded', () => {

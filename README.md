@@ -30,10 +30,13 @@ People join with a link. Nothing to install.
 
 ## Features
 
+![The same class in its seating chart: row A at the front, seats A1–E8](docs/gallery-40.png)
+
 **Seats**
 - Fixed seating chart, labelled like a theatre (row A is the front, A1…E8).
 - People return to their seat automatically, matched by (in order): their personal
-  link, the device they used last time, or the name they type.
+  link, or the name they type (on any device). Typing a different name on a shared
+  computer counts as a different person.
 - Hosts drag faces to move people; the move is remembered for future meetings.
 - Paste a class list to pre-assign seats; copy each student's personal link.
 - Empty seats stay visible so nobody's position shifts when others come and go
@@ -100,8 +103,15 @@ networks worldwide, and has a free tier.
    ```
 3. Open your app's URL, start a meeting, share the link.
 
+Set `CREATE_CODE` to a passphrase so only people you tell can *start* meetings on your
+deployment (anyone with a meeting link can still join).
+
 Seating charts are stored in `DATA_DIR` (default `./data`). Give it a persistent disk
 so seats survive restarts (the Render blueprint includes one).
+
+> **Usage note.** LiveKit Cloud bills by participant-minutes: a 40-person, one-hour
+> class is about 2,400. Check the free tier's monthly allowance on their pricing page
+> before relying on it every week; Option C has no per-minute cost.
 
 ### Option B — Share from your laptop in one minute
 
@@ -129,6 +139,10 @@ This runs LiveKit, Skypy and Caddy (automatic HTTPS certificates) on one domain.
 these firewall ports: `80/tcp`, `443/tcp`, `7881/tcp`, `3478/udp`, `50000-60000/udp`.
 See [`deploy/`](deploy) for the configs.
 
+Media falls back to TCP port 7881 and a TURN relay on UDP 3478 for restrictive networks.
+Networks that allow *only* web traffic on port 443 need TURN over TLS (see LiveKit's
+self-hosting guide), or use LiveKit Cloud, which handles that for you.
+
 ## Host guide
 
 *A one-page guide for the person running the meeting.*
@@ -142,7 +156,7 @@ meeting link. Anyone with it can join.
 
 **Seats work like this.**
 - The first time someone joins, they take the next free seat — and it becomes theirs.
-- Next time they join (same device, or typing the same name) they sit there again.
+- Next time they join with the same name (on any computer or phone) they sit there again.
 - Seats of people who aren't here stay empty, showing their name faintly.
 
 **Set up a seating chart** (optional). Open **Seats & settings** (chair icon, bottom right):
@@ -168,8 +182,12 @@ in Seats & settings downloads who was here and where they sat.
 **Keyboard shortcuts.** `M` mute · `V` camera · `H` raise hand · `C` chat · `P` people ·
 `E` show/hide empty seats · double-click a face to pin it.
 
-**Host link.** *Seats & settings → Host link* gives a link that makes whoever opens it a
-host of this room — use it to manage the room from another computer. Keep it private.
+**Co-hosts.** Hover a face → **⋯ → Make co-host** to give a TA host tools (moving seats,
+muting, removing). Co-hosts can't hand out host rights themselves.
+
+**Host link.** *Seats & settings → Host link* (room owner only) gives a link that makes
+whoever opens it an owner of this room — use it to manage the room from another computer.
+Keep it private.
 
 ## How it works
 
@@ -236,6 +254,7 @@ node tests/load/classroom.mjs --people 40         # in another
 | `DATA_DIR` | `./data` | Where rooms and seating charts are saved |
 | `SEAT_GRACE_SECONDS` | `30` | How long a dropped connection keeps its seat |
 | `ROOM_CREATE_LIMIT` | `30` | Rooms one IP address may create per hour |
+| `CREATE_CODE` | *(none)* | If set, starting a meeting requires this access code (joining never does) |
 | `TRUST_PROXY` | private ranges | Express `trust proxy` setting when behind a proxy |
 
 `GET /api/health` reports whether the server can reach LiveKit.
@@ -249,5 +268,7 @@ node tests/load/classroom.mjs --people 40         # in another
   Strict networks that block UDP work best with LiveKit Cloud (it relays over port 443).
 - **Someone is in the wrong seat.** *Arrange seats* and drag them; it's remembered.
   If they joined under a different name, give them their personal link.
+- **"You're already in this meeting in too many windows."** One person can have up to
+  four windows in a meeting; close an old tab.
 - **No sound.** If a banner says the browser paused sound, click *Turn on sound*.
   Check the speaker choice under the arrow next to the microphone button.

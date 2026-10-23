@@ -20,6 +20,9 @@ services:
         sync: false
       - key: LIVEKIT_API_SECRET
         sync: false
+      # Optional: only people who know this code can start meetings.
+      - key: CREATE_CODE
+        sync: false
     disk:
       name: skypy-data
       mountPath: /var/data
