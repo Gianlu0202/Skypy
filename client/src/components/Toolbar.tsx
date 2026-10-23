@@ -252,7 +252,7 @@ function ReactionPicker({ meeting }: { meeting: Meeting }) {
     <>
       <button
         ref={anchor}
-        className={`tb-btn${open ? ' active-soft' : ''}`}
+        className={`tb-btn tb-react${open ? ' active-soft' : ''}`}
         onClick={() => setOpen((v) => !v)}
         aria-label="Send a reaction"
         data-tip="React"

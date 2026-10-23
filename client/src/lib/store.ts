@@ -12,6 +12,7 @@ export interface Toast {
   text: string;
   tone: 'info' | 'warn' | 'error' | 'success';
   title?: string;
+  icon?: 'chat' | 'hand';
   action?: { label: string; run: () => void };
   ttl: number;
 }
@@ -94,7 +95,15 @@ export function setPanel(panel: Panel): void {
 
 let toastSeq = 1;
 export function toast(text: string, opts: Partial<Omit<Toast, 'id' | 'text'>> = {}): number {
-  const t: Toast = { id: toastSeq++, text, tone: opts.tone ?? 'info', title: opts.title, action: opts.action, ttl: opts.ttl ?? 4200 };
+  const t: Toast = {
+    id: toastSeq++,
+    text,
+    tone: opts.tone ?? 'info',
+    title: opts.title,
+    icon: opts.icon,
+    action: opts.action,
+    ttl: opts.ttl ?? 4200,
+  };
   useStore.setState((s) => ({ toasts: [...s.toasts.slice(-3), t] }));
   if (t.ttl > 0) window.setTimeout(() => dismissToast(t.id), t.ttl);
   return t.id;

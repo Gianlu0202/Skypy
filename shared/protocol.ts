@@ -88,7 +88,8 @@ export interface ChatMessage {
 }
 
 export interface HostData {
-  hostKey: string;
+  /** The room's host key: sent to the room owner only, never to co-hosts. */
+  hostKey: string | null;
   /** Personal invite token per member id. */
   invites: Record<string, string>;
 }
@@ -112,6 +113,8 @@ export type ClientMsg =
   | { t: 'rename'; name: string }
   | { t: 'chat'; text: string }
   | { t: 'hand'; raised: boolean }
+  /** Ask for a fresh media token (before reconnecting to LiveKit). */
+  | { t: 'token' }
   | { t: 'react'; emoji: string }
   // host / co-host only
   | { t: 'seat.assign'; memberId: string; seat: number }
@@ -147,6 +150,7 @@ export type ServerMsg =
   | { t: 'state'; state: RoomState; host: boolean; hostData: HostData | null }
   | { t: 'chat'; msg: ChatMessage }
   | { t: 'react'; sessionId: string; emoji: string }
+  | { t: 'token'; token: string }
   | { t: 'notice'; level: 'info' | 'warn'; text: string }
   | { t: 'kicked'; reason: string }
   | { t: 'denied'; code: DenyCode; message: string }

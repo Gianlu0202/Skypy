@@ -57,7 +57,7 @@ export interface StoreSnapshot {
   sessionId: string | null;
   memberId: string | null;
   host: boolean;
-  hostData: { invites: Record<string, string> } | null;
+  hostData: { hostKey: string | null; invites: Record<string, string> } | null;
   media: string;
   signal: string;
   mic: boolean;

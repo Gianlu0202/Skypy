@@ -637,6 +637,17 @@ textarea::placeholder {
   transition-delay: 350ms;
 }
 
+/* Buttons at the right edge open their tooltip leftwards. */
+.tb-right [data-tip]::after {
+  left: auto;
+  right: 0;
+  transform: translate(0, 4px);
+}
+
+.tb-right [data-tip]:hover::after {
+  transform: translate(0, 0);
+}
+
 @media (hover: none) {
   [data-tip]::after {
     display: none;
@@ -1465,6 +1476,7 @@ textarea::placeholder {
 }
 
 .device-select.wide {
+  flex: none;
   max-width: none;
   height: 42px;
   border-radius: var(--r);
@@ -1884,6 +1896,14 @@ textarea::placeholder {
   }
 }
 
+/* No room for a menu button on the smallest faces (use the People panel). */
+@container (max-width: 110px) {
+  .tile-more,
+  .tile-flag {
+    display: none;
+  }
+}
+
 @container (max-height: 70px) {
   .tile-name {
     font-size: 10px;
@@ -2112,8 +2132,14 @@ textarea::placeholder {
   backdrop-filter: blur(10px);
   font-size: 12.5px;
   font-weight: 600;
-  max-width: 50%;
+  max-width: min(60%, calc(100% - 60px));
   white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .stage-chip {
+    max-width: calc(100% - 50px);
+  }
 }
 
 .stage-chip span {
@@ -2610,7 +2636,7 @@ textarea::placeholder {
 }
 
 @media (max-width: 480px) {
-  .tb-center > .tb-btn:nth-of-type(n + 4) {
+  .tb-react {
     display: none;
   }
 }
@@ -3196,6 +3222,10 @@ textarea::placeholder {
   margin-top: 1px;
   color: var(--accent-hover);
   flex: none;
+}
+
+.toast-icon .toast-hand {
+  color: var(--warn);
 }
 
 .toast-success .toast-icon {

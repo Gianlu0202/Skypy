@@ -24,14 +24,17 @@ import { hashKey, normalizeSettings, randomToken, type MemberRecord, type RoomRe
 
 interface Session extends Occupant {
   name: string;
-  tabId: string;
+  /** Secret per-tab key: hash of device key + tab id (never sent to others). */
+  tabKey: string;
+  deviceHash: string;
   /** Joined with the room's host key. */
   owner: boolean;
   host: boolean;
   hand: number | null;
   ws: WebSocket | null;
   awayTimer: NodeJS.Timeout | null;
-  recent: number[];
+  /** Recent action timestamps per kind, for rate limiting. */
+  recent: Map<string, number[]>;
 }
 
 class RoomRuntime {
@@ -53,6 +56,7 @@ const seatIndex = z
   .min(0)
   .max(LIMITS.maxSeats - 1);
 const shortText = z.string().max(LIMITS.nameLength * 2);
+const memberId = z.string().regex(/^[A-Za-z0-9]{4,32}$/);
 
 const helloSchema = z.object({
   t: z.literal('hello'),
@@ -72,7 +76,7 @@ const msgSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('chat'), text: z.string().max(LIMITS.chatLength * 2) }),
   z.object({ t: z.literal('hand'), raised: z.boolean() }),
   z.object({ t: z.literal('react'), emoji: z.string().max(16) }),
-  z.object({ t: z.literal('seat.assign'), memberId: z.string().max(64), seat: seatIndex }),
+  z.object({ t: z.literal('seat.assign'), memberId, seat: seatIndex }),
   z.object({ t: z.literal('seat.clear'), seat: seatIndex }),
   z.object({ t: z.literal('seat.name'), seat: seatIndex, name: shortText }),
   z.object({ t: z.literal('seats.clearAll') }),
@@ -81,8 +85,8 @@ const msgSchema = z.discriminatedUnion('t', [
     names: z.array(shortText).max(LIMITS.rosterImport),
     replace: z.boolean(),
   }),
-  z.object({ t: z.literal('member.forget'), memberId: z.string().max(64) }),
-  z.object({ t: z.literal('member.cohost'), memberId: z.string().max(64), value: z.boolean() }),
+  z.object({ t: z.literal('member.forget'), memberId }),
+  z.object({ t: z.literal('member.cohost'), memberId, value: z.boolean() }),
   z.object({
     t: z.literal('settings'),
     patch: z.object({
@@ -103,6 +107,7 @@ const msgSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('muteAll') }),
   z.object({ t: z.literal('kick'), sessionId: z.string().max(160) }),
   z.object({ t: z.literal('hand.lower'), sessionId: z.string().max(160) }),
+  z.object({ t: z.literal('token') }),
 ]);
 
 const HOST_ONLY = new Set<ClientMsg['t']>([
@@ -121,6 +126,13 @@ const HOST_ONLY = new Set<ClientMsg['t']>([
 ]);
 
 const MAX_SESSIONS = 120;
+/** Connections one person (or one browser) may have open at once. */
+const MAX_PER_PERSON = 4;
+
+/** Own-property lookup: never resolves names like "__proto__" or "constructor". */
+function memberOf(room: RoomRecord, id: string | null | undefined): MemberRecord | undefined {
+  return id && Object.hasOwn(room.members, id) ? room.members[id] : undefined;
+}
 
 function safeEqual(a: string, b: string): boolean {
   const ha = crypto.createHash('sha256').update(a).digest();
@@ -229,6 +241,13 @@ export class Hub {
   private join(ws: WebSocket, msg: Extract<ClientMsg, { t: 'hello' }>): { rt: RoomRuntime; session: Session } | null {
     const rt = this.runtime(msg.roomId);
     if (!rt) return this.deny(ws, 'not_found', 'This meeting link is not valid. Check the link or ask the host for a new one.');
+    const joined = this.admit(ws, rt, msg);
+    // Don't keep a runtime alive for a room nobody managed to join.
+    if (!joined && rt.sessions.size === 0 && !rt.idleTimer) this.scheduleIdle(rt);
+    return joined;
+  }
+
+  private admit(ws: WebSocket, rt: RoomRuntime, msg: Extract<ClientMsg, { t: 'hello' }>): { rt: RoomRuntime; session: Session } | null {
     const room = rt.record;
     const owner = !!msg.hostKey && safeEqual(msg.hostKey, room.hostKey);
     const name = cleanName(msg.name);
@@ -246,20 +265,34 @@ export class Hub {
       return this.deny(ws, 'removed', 'The host removed you from this meeting.');
     }
 
-    const m = member ?? this.createMember(room, name);
     const deviceHash = hashKey(msg.deviceKey);
+    // The tab key proves "same browser, same tab" without revealing the tab id.
+    const tabKey = hashKey(`${msg.deviceKey}:${msg.tabId}`).slice(0, 16);
+    const resuming = !!member && rt.sessions.has(`${member.id}.${tabKey}`);
+    if (!resuming) {
+      const sessions = [...rt.sessions.values()];
+      const sameDevice = sessions.filter((x) => x.deviceHash === deviceHash && x.tabKey !== tabKey).length;
+      const samePerson = member ? sessions.filter((x) => x.memberId === member.id && x.tabKey !== tabKey).length : 0;
+      if (sameDevice >= MAX_PER_PERSON || samePerson >= MAX_PER_PERSON) {
+        return this.deny(ws, 'full', 'You’re already in this meeting in too many windows. Close one and try again.');
+      }
+      if (rt.sessions.size >= MAX_SESSIONS) return this.deny(ws, 'full', 'This meeting is full.');
+    }
+
+    const m = member ?? this.createMember(room, name);
     m.name = name;
     m.norm = normalizeName(name);
     m.devices = [...m.devices.filter((d) => d !== deviceHash), deviceHash].slice(-8);
     m.lastSeen = Date.now();
+    const id = `${m.id}.${tabKey}`;
 
-    const sessionId = `${m.id}.${msg.tabId}`;
-    // A tab can only be one person; drop stale sessions from this tab.
+    // A tab can only be one person: drop this tab's earlier session if it
+    // joined under another name.
     for (const other of rt.sessions.values()) {
-      if (other.tabId === msg.tabId && other.id !== sessionId) this.removeSession(rt, other, false);
+      if (other.tabKey === tabKey && other.id !== id) this.removeSession(rt, other, false);
     }
 
-    let session = rt.sessions.get(sessionId);
+    let session = rt.sessions.get(id);
     if (session) {
       if (session.ws && session.ws !== ws) {
         const old = session.ws;
@@ -272,22 +305,22 @@ export class Hub {
       session.name = name;
       session.owner = owner;
     } else {
-      if (rt.sessions.size >= MAX_SESSIONS) return this.deny(ws, 'full', 'This meeting is full.');
       session = {
-        id: sessionId,
+        id,
         memberId: m.id,
         seat: null,
         joinedAt: Date.now(),
         name,
-        tabId: msg.tabId,
+        tabKey,
+        deviceHash,
         owner,
         host: false,
         hand: null,
         ws,
         awayTimer: null,
-        recent: [],
+        recent: new Map(),
       };
-      rt.sessions.set(sessionId, session);
+      rt.sessions.set(id, session);
     }
     session.host = owner || m.cohost;
     if (rt.idleTimer) {
@@ -304,12 +337,7 @@ export class Hub {
   private async welcome(ws: WebSocket, rt: RoomRuntime, session: Session): Promise<void> {
     let lkToken: string;
     try {
-      lkToken = await livekit.createToken({
-        roomId: rt.record.id,
-        identity: session.id,
-        name: session.name,
-        host: session.host,
-      });
+      lkToken = await this.mediaToken(rt, session);
     } catch (err) {
       console.error('[hub] token creation failed:', err);
       send(ws, { t: 'error', message: 'Could not create a media token. Check the server LiveKit configuration.' });
@@ -326,10 +354,23 @@ export class Hub {
       livekit: { url: config.livekit.url, token: lkToken },
       state: this.snapshot(rt),
       chat: rt.chat,
-      hostData: session.host ? this.hostData(rt) : null,
+      hostData: session.host ? this.hostData(rt, session) : null,
       serverTime: Date.now(),
     });
     this.broadcast(rt);
+  }
+
+  private canShareScreen(rt: RoomRuntime, s: Session): boolean {
+    return rt.record.settings.screenShare === 'everyone' || s.host;
+  }
+
+  private mediaToken(rt: RoomRuntime, s: Session): Promise<string> {
+    return livekit.createToken({ roomId: rt.record.id, identity: s.id, name: s.name, screenShare: this.canShareScreen(rt, s) });
+  }
+
+  /** Re-apply media permissions (screen sharing) after a policy or role change. */
+  private syncPermissions(rt: RoomRuntime): void {
+    for (const s of rt.sessions.values()) void livekit.setScreenSharePermission(rt.record.id, s.id, this.canShareScreen(rt, s));
   }
 
   private resolveMember(rt: RoomRuntime, who: { name: string; deviceKey: string; invite?: string }): MemberRecord | null {
@@ -338,14 +379,20 @@ export class Hub {
       const byInvite = members.find((m) => safeEqual(m.invite, who.invite!));
       if (byInvite) return byInvite;
     }
-    const deviceHash = hashKey(who.deviceKey);
-    const byDevice = members.filter((m) => m.devices.includes(deviceHash)).sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))[0];
-    if (byDevice) return byDevice;
     const norm = normalizeName(who.name);
+    // This browser joined before under the same name (someone else typing a
+    // different name on a shared lab computer is a different person).
+    const deviceHash = hashKey(who.deviceKey);
+    const byDevice = members
+      .filter((m) => m.norm === norm && m.devices.includes(deviceHash))
+      .sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))[0];
+    if (byDevice) return byDevice;
+    // Same name from a new device: the roster entry, unless it's in use or a
+    // co-host (host rights need the original device or the personal link).
     const online = new Set([...rt.sessions.values()].map((s) => s.memberId));
     const reserved = new Set(rt.record.seats);
     const byName = members
-      .filter((m) => m.norm === norm && !online.has(m.id))
+      .filter((m) => m.norm === norm && !online.has(m.id) && !m.cohost)
       // Prefer the roster entry that actually has a seat.
       .sort((a, b) => Number(reserved.has(b.id)) - Number(reserved.has(a.id)) || (b.lastSeen ?? 0) - (a.lastSeen ?? 0))[0];
     return byName ?? null;
@@ -354,7 +401,7 @@ export class Hub {
   private createMember(room: RoomRecord, name: string): MemberRecord {
     this.pruneMembers(room);
     let id = newMemberId();
-    while (room.members[id]) id = newMemberId();
+    while (Object.hasOwn(room.members, id)) id = newMemberId();
     const m: MemberRecord = {
       id,
       name,
@@ -393,7 +440,7 @@ export class Hub {
     if (session.awayTimer) clearTimeout(session.awayTimer);
     session.awayTimer = null;
     rt.sessions.delete(session.id);
-    const member = rt.record.members[session.memberId];
+    const member = memberOf(rt.record, session.memberId);
     if (member) member.lastSeen = Date.now();
     if (rt.spotlight === session.id) rt.spotlight = null;
     if (session.ws) {
@@ -444,9 +491,9 @@ export class Hub {
 
       case 'rename': {
         const name = cleanName(msg.name);
-        if (!name) return;
+        if (!name || !this.allow(s, 'rename', 5, 10_000)) return;
         s.name = name;
-        const m = room.members[s.memberId];
+        const m = memberOf(room, s.memberId);
         if (m) {
           m.name = name;
           m.norm = normalizeName(name);
@@ -457,7 +504,7 @@ export class Hub {
 
       case 'chat': {
         const text = msg.text.replace(/\r\n/g, '\n').trim().slice(0, LIMITS.chatLength);
-        if (!text || !this.allow(s, 8, 5000)) return;
+        if (!text || !this.allow(s, 'chat', 8, 5000)) return;
         const chat: ChatMessage = {
           id: randomToken(9),
           sessionId: s.id,
@@ -473,11 +520,21 @@ export class Hub {
       }
 
       case 'hand':
+        if (!this.allow(s, 'hand', 10, 10_000)) return;
         s.hand = msg.raised ? (s.hand ?? Date.now()) : null;
         break;
 
+      case 'token':
+        // Fresh media token before the client reconnects to LiveKit.
+        if (!this.allow(s, 'token', 6, 60_000)) return;
+        void this.mediaToken(rt, s).then(
+          (token) => send(s.ws, { t: 'token', token }),
+          (err) => console.error('[hub] token refresh failed:', err),
+        );
+        return;
+
       case 'react': {
-        if (!(REACTIONS as readonly string[]).includes(msg.emoji) || !this.allow(s, 10, 4000)) return;
+        if (!(REACTIONS as readonly string[]).includes(msg.emoji) || !this.allow(s, 'react', 10, 4000)) return;
         for (const other of rt.sessions.values()) send(other.ws, { t: 'react', sessionId: s.id, emoji: msg.emoji });
         return;
       }
@@ -494,7 +551,7 @@ export class Hub {
         break;
 
       case 'seat.assign': {
-        if (msg.seat >= room.seats.length || !room.members[msg.memberId]) return;
+        if (msg.seat >= room.seats.length || !memberOf(room, msg.memberId)) return;
         assignSeat(room.seats, [...rt.sessions.values()], msg.memberId, msg.seat);
         this.reseat(rt);
         this.store.save(room.id);
@@ -515,10 +572,8 @@ export class Hub {
           room.seats[msg.seat] = null;
         } else {
           const norm = normalizeName(name);
-          const existing =
-            room.seats[msg.seat] && room.members[room.seats[msg.seat]!]?.norm === norm
-              ? room.members[room.seats[msg.seat]!]
-              : Object.values(room.members).find((m) => m.norm === norm);
+          const current = memberOf(room, room.seats[msg.seat]);
+          const existing = current?.norm === norm ? current : Object.values(room.members).find((m) => m.norm === norm);
           const m = existing ?? this.createMember(room, name);
           if (!existing) m.name = name;
           assignSeat(room.seats, [...rt.sessions.values()], m.id, msg.seat);
@@ -568,20 +623,22 @@ export class Hub {
         const idx = room.seats.indexOf(msg.memberId);
         if (idx >= 0) room.seats[idx] = null;
         const online = [...rt.sessions.values()].some((x) => x.memberId === msg.memberId);
-        if (!online && room.members[msg.memberId] && !room.members[msg.memberId].cohost) delete room.members[msg.memberId];
+        const forgotten = memberOf(room, msg.memberId);
+        if (!online && forgotten && !forgotten.cohost) delete room.members[msg.memberId];
         this.reseat(rt);
         this.store.save(room.id);
         break;
       }
 
       case 'member.cohost': {
-        const m = room.members[msg.memberId];
+        const m = memberOf(room, msg.memberId);
         if (!m) return;
         m.cohost = msg.value;
         for (const other of rt.sessions.values()) {
           if (other.memberId === m.id) other.host = other.owner || m.cohost;
         }
         this.store.save(room.id);
+        this.syncPermissions(rt);
         break;
       }
 
@@ -597,9 +654,11 @@ export class Hub {
           room.seats = seats;
           for (const other of rt.sessions.values()) other.seat = remap(other.seat);
         }
+        const shareChanged = next.screenShare !== room.settings.screenShare;
         room.settings = next;
         this.reseat(rt);
         this.store.save(room.id);
+        if (shareChanged) this.syncPermissions(rt);
         break;
       }
 
@@ -630,12 +689,16 @@ export class Hub {
 
       case 'kick': {
         const target = rt.sessions.get(msg.sessionId);
-        if (!target || target === s || (target.owner && !s.owner)) return;
+        if (!target || target.memberId === s.memberId || (target.owner && !s.owner)) return;
         rt.removed.add(target.memberId);
-        send(target.ws, { t: 'kicked', reason: `${s.name} removed you from the meeting.` });
-        void livekit.removeParticipant(room.id, target.id);
-        this.removeSession(rt, target, true);
-        return;
+        // Remove every window of that person and revoke their media tokens.
+        for (const other of [...rt.sessions.values()]) {
+          if (other.memberId !== target.memberId) continue;
+          send(other.ws, { t: 'kicked', reason: `${s.name} removed you from the meeting.` });
+          void livekit.removeParticipant(room.id, other.id, { revoke: true });
+          this.removeSession(rt, other, false);
+        }
+        break;
       }
 
       default:
@@ -644,12 +707,16 @@ export class Hub {
     this.broadcast(rt);
   }
 
-  /** Simple per-session rate limit: at most `max` actions per `windowMs`. */
-  private allow(s: Session, max: number, windowMs: number): boolean {
+  /** Per-session rate limit: at most `max` actions of a kind per `windowMs`. */
+  private allow(s: Session, kind: string, max: number, windowMs: number): boolean {
     const now = Date.now();
-    s.recent = s.recent.filter((t) => now - t < windowMs);
-    if (s.recent.length >= max) return false;
-    s.recent.push(now);
+    const recent = (s.recent.get(kind) ?? []).filter((t) => now - t < windowMs);
+    if (recent.length >= max) {
+      s.recent.set(kind, recent);
+      return false;
+    }
+    recent.push(now);
+    s.recent.set(kind, recent);
     return true;
   }
 
@@ -661,7 +728,7 @@ export class Hub {
     const relevant = new Set<string>([...online, ...(room.seats.filter(Boolean) as string[])]);
     const members: MemberView[] = [];
     for (const id of relevant) {
-      const m = room.members[id];
+      const m = memberOf(room, id);
       if (!m) continue;
       members.push({ id, name: m.name, cohost: m.cohost, online: online.has(id), lastSeen: m.lastSeen });
     }
@@ -689,14 +756,15 @@ export class Hub {
     };
   }
 
-  private hostData(rt: RoomRuntime): HostData {
+  /** Host-only data. The room's host key goes only to its owner, not co-hosts. */
+  private hostData(rt: RoomRuntime, s: Session): HostData {
     const room = rt.record;
     const online = new Set([...rt.sessions.values()].map((s) => s.memberId));
     const invites: Record<string, string> = {};
     for (const m of Object.values(room.members)) {
       if (online.has(m.id) || room.seats.includes(m.id)) invites[m.id] = m.invite;
     }
-    return { hostKey: room.hostKey, invites };
+    return { hostKey: s.owner ? room.hostKey : null, invites };
   }
 
   /** Send the full state to everyone, coalescing bursts into one message. */
@@ -707,12 +775,16 @@ export class Hub {
       rt.pending = false;
       const state = this.snapshot(rt);
       const plain = JSON.stringify({ t: 'state', state, host: false, hostData: null } satisfies ServerMsg);
-      let forHost: string | null = null;
+      const forHost = new Map<boolean, string>(); // keyed by "is owner"
       for (const s of rt.sessions.values()) {
         if (!s.ws || s.ws.readyState !== s.ws.OPEN) continue;
         if (s.host) {
-          forHost ??= JSON.stringify({ t: 'state', state, host: true, hostData: this.hostData(rt) } satisfies ServerMsg);
-          s.ws.send(forHost);
+          let msg = forHost.get(s.owner);
+          if (!msg) {
+            msg = JSON.stringify({ t: 'state', state, host: true, hostData: this.hostData(rt, s) } satisfies ServerMsg);
+            forHost.set(s.owner, msg);
+          }
+          s.ws.send(msg);
         } else {
           s.ws.send(plain);
         }

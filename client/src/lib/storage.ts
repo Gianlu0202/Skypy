@@ -166,7 +166,8 @@ export interface UiPrefs {
 }
 
 const UI_DEFAULTS: UiPrefs = {
-  showEmpty: true,
+  // A full seating chart is too small to read on a phone: default to compact there.
+  showEmpty: typeof window === 'undefined' || Math.min(window.innerWidth, window.innerHeight) >= 600,
   layout: 'room',
   split: { sides: null, stacked: null },
   mirror: true,

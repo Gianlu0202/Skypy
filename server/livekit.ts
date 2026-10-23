@@ -8,21 +8,45 @@ function rooms(): RoomServiceClient {
   return client;
 }
 
-export async function createToken(opts: { roomId: string; identity: string; name: string; host: boolean }): Promise<string> {
+function sources(screenShare: boolean): TrackSource[] {
+  const base = [TrackSource.CAMERA, TrackSource.MICROPHONE];
+  return screenShare ? [...base, TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO] : base;
+}
+
+export async function createToken(opts: { roomId: string; identity: string; name: string; screenShare: boolean }): Promise<string> {
   const at = new AccessToken(config.livekit.apiKey, config.livekit.apiSecret, {
     identity: opts.identity,
     name: opts.name,
-    ttl: '12h',
+    // The client asks for a fresh token whenever it reconnects to media.
+    ttl: '2h',
   });
   at.addGrant({
     room: opts.roomId,
     roomJoin: true,
     canPublish: true,
+    canPublishSources: sources(opts.screenShare),
     canSubscribe: true,
     canPublishData: true,
     canUpdateOwnMetadata: false,
   });
   return at.toJwt();
+}
+
+/** Allow or forbid screen sharing for one participant, enforced by LiveKit. */
+export async function setScreenSharePermission(roomId: string, identity: string, allowed: boolean): Promise<void> {
+  try {
+    await rooms().updateParticipant(roomId, identity, {
+      permission: {
+        canPublish: true,
+        canSubscribe: true,
+        canPublishData: true,
+        canUpdateMetadata: false,
+        canPublishSources: sources(allowed),
+      },
+    });
+  } catch {
+    // Not connected to media right now; their next token carries the rule.
+  }
 }
 
 /** Server-side mute of a participant's microphone. Hosts can mute, never unmute. */
@@ -38,9 +62,14 @@ export async function muteMicrophone(roomId: string, identity: string): Promise<
   }
 }
 
-export async function removeParticipant(roomId: string, identity: string): Promise<void> {
+/** Disconnect someone from media; with `revoke`, their existing tokens stop working. */
+export async function removeParticipant(roomId: string, identity: string, opts: { revoke?: boolean } = {}): Promise<void> {
   try {
-    await rooms().removeParticipant(roomId, identity);
+    await rooms().removeParticipant(
+      roomId,
+      identity,
+      opts.revoke ? { revokeTokenTs: BigInt(Math.floor(Date.now() / 1000)) } : undefined,
+    );
   } catch (err) {
     // Not connected to media (yet) — nothing to remove.
     console.warn(`[livekit] remove ${identity}:`, (err as Error).message);

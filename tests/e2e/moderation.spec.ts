@@ -101,3 +101,64 @@ test('co-hosts get host controls', async ({ browser }) => {
     await closeAll(people);
   }
 });
+
+test('nobody can knock others out by reusing a visible session id', async ({ browser }) => {
+  const room = await createRoom({ name: 'Spoof', rows: 2, cols: 3 });
+  const people: Person[] = [];
+  const sockets: WebSocket[] = [];
+  try {
+    const host = await join(browser, room, 'Prof Bill', { hostKey: room.hostKey });
+    people.push(host);
+    const hostId = (await store(host.page)).sessionId!;
+    // An attacker sees every session id in the room state and tries to reuse
+    // the tab part of the host's id from a script.
+    const tabPart = hostId.split('.')[1];
+    const url = (process.env.BASE ?? 'http://localhost:3000').replace(/^http/, 'ws') + '/ws';
+    const ws = new WebSocket(url);
+    sockets.push(ws);
+    await new Promise<void>((resolve, reject) => {
+      ws.onopen = () => resolve();
+      ws.onerror = () => reject(new Error('socket error'));
+    });
+    const reply = new Promise<{ t: string }>((resolve) => {
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(String(e.data));
+        if (msg.t === 'welcome' || msg.t === 'denied') resolve(msg);
+      };
+    });
+    ws.send(JSON.stringify({ t: 'hello', roomId: room.id, name: 'Mallory', deviceKey: 'attackerdevicekey000', tabId: tabPart }));
+    expect((await reply).t).toBe('welcome');
+    // The host is still in the meeting, still the host, alongside the attacker.
+    await expect.poll(async () => (await store(host.page)).state?.sessions.length).toBe(2);
+    const s = await store(host.page);
+    expect(s.state!.sessions.find((x) => x.id === hostId)?.away).toBe(false);
+    expect(s.host).toBe(true);
+    expect(s.ended).toBeNull();
+  } finally {
+    sockets.forEach((w) => w.close());
+    await closeAll(people);
+  }
+});
+
+test('co-hosts never receive the room’s host key', async ({ browser }) => {
+  const room = await createRoom({ name: 'Keys', rows: 2, cols: 3 });
+  const people: Person[] = [];
+  try {
+    const host = await join(browser, room, 'Prof Bill', { hostKey: room.hostKey });
+    const ta = await join(browser, room, 'Teaching Assistant');
+    people.push(host, ta);
+    expect((await store(host.page)).hostData?.hostKey).toBe(room.hostKey);
+    const taId = (await store(ta.page)).sessionId!;
+    await host.page.locator(`.tile[data-identity="${taId}"]`).hover();
+    await host.page.locator(`.tile[data-identity="${taId}"] .tile-more`).click();
+    await host.page.getByRole('menuitem', { name: 'Make co-host' }).click();
+    await expect.poll(async () => (await store(ta.page)).host).toBe(true);
+    const taStore = await store(ta.page);
+    expect(taStore.hostData).not.toBeNull();
+    expect(taStore.hostData?.hostKey ?? null).toBeNull();
+    await ta.page.getByRole('button', { name: 'Seating & room settings' }).click();
+    await expect(ta.page.getByRole('button', { name: 'Host link' })).toHaveCount(0);
+  } finally {
+    await closeAll(people);
+  }
+});

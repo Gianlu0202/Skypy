@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { CircleAlert, CircleCheck, Info, Loader2, Mic, Video, Volume2, VolumeX, WifiOff, X } from 'lucide-react';
+import { CircleAlert, CircleCheck, Hand, Info, Loader2, MessageSquare, Mic, Video, Volume2, VolumeX, WifiOff, X } from 'lucide-react';
 import { LIMITS } from '../../../shared/protocol.ts';
 import type { Meeting } from '../lib/meeting.ts';
 import { saveName } from '../lib/storage.ts';
@@ -14,7 +14,11 @@ export function Toasts() {
       {toasts.map((t) => (
         <div key={t.id} className={`toast toast-${t.tone}`}>
           <span className="toast-icon">
-            {t.tone === 'success' ? (
+            {t.icon === 'chat' ? (
+              <MessageSquare size={17} />
+            ) : t.icon === 'hand' ? (
+              <Hand size={17} className="toast-hand" />
+            ) : t.tone === 'success' ? (
               <CircleCheck size={17} />
             ) : t.tone === 'warn' || t.tone === 'error' ? (
               <CircleAlert size={17} />
@@ -98,11 +102,14 @@ export function Dialog(props: { title: string; onClose: () => void; children: Re
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') props.onClose();
+      if (e.key === 'Escape' && !e.defaultPrevented) {
+        e.preventDefault();
+        props.onClose();
+      }
     };
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
     ref.current?.focus();
-    return () => window.removeEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, []);
   return (
     <div className="dialog-backdrop" onPointerDown={(e) => e.target === e.currentTarget && props.onClose()}>

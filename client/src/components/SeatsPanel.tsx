@@ -32,6 +32,29 @@ export function SeatsPanel({ meeting }: { meeting: Meeting }) {
 
   const update = (patch: Partial<RoomSettings> & { name?: string }) => meeting.send({ t: 'settings', patch });
 
+  /** Resize the room, warning first if reserved seats would fall off the grid. */
+  const resize = (newRows: number, newCols: number) => {
+    let outside = 0;
+    let inside = 0;
+    state.seats.forEach((m, i) => {
+      if (!m) return;
+      if (Math.floor(i / cols) < newRows && i % cols < newCols) inside++;
+      else outside++;
+    });
+    if (outside > 0) {
+      const free = newRows * newCols - inside;
+      const lost = Math.max(0, outside - free);
+      const msg =
+        `${outside} reserved ${outside === 1 ? 'seat is' : 'seats are'} outside the new size. ` +
+        (lost > 0
+          ? `${outside - lost} will move to empty seats and ${lost} will lose their reservation.`
+          : `${outside === 1 ? 'It' : 'They'} will move to the first empty seats.`) +
+        ' Continue?';
+      if (!confirm(msg)) return;
+    }
+    update({ rows: newRows, cols: newCols });
+  };
+
   const memberAt = (seat: number): string | null => state.seats[seat] ?? sittingAt.get(seat)?.memberId ?? null;
 
   const onDrop = (e: DragEvent, seat: number) => {
@@ -180,7 +203,7 @@ export function SeatsPanel({ meeting }: { meeting: Meeting }) {
               value={rows}
               min={LIMITS.minRows}
               max={Math.min(LIMITS.maxRows, Math.floor(LIMITS.maxSeats / cols))}
-              onChange={(v) => update({ rows: v })}
+              onChange={(v) => resize(v, cols)}
             />
             <span className="size-x">×</span>
             <Stepper
@@ -188,7 +211,7 @@ export function SeatsPanel({ meeting }: { meeting: Meeting }) {
               value={cols}
               min={LIMITS.minCols}
               max={Math.min(LIMITS.maxCols, Math.floor(LIMITS.maxSeats / rows))}
-              onChange={(v) => update({ cols: v })}
+              onChange={(v) => resize(rows, v)}
             />
           </div>
           <p className="panel-hint">People keep their row and seat number when you resize.</p>
@@ -292,7 +315,7 @@ export function SeatsPanel({ meeting }: { meeting: Meeting }) {
             >
               <Link2 size={15} /> Meeting link
             </button>
-            {hostData && (
+            {hostData?.hostKey && (
               <button
                 className="btn btn-secondary btn-small"
                 onClick={async () => {

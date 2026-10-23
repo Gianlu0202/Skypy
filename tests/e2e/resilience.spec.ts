@@ -70,3 +70,19 @@ test('a duplicated tab joins as a separate connection', async ({ browser }) => {
     await closeAll(people);
   }
 });
+
+test('clicking Join instantly still turns on camera and microphone', async ({ browser }) => {
+  const room = await createRoom({ name: 'Quick', rows: 2, cols: 2 });
+  const people: Person[] = [];
+  try {
+    // join() fills the name and clicks Join without waiting for the preview.
+    const quick = await join(browser, room, 'Quick Clicker');
+    people.push(quick);
+    await expect.poll(async () => (await store(quick.page)).media).toBe('connected');
+    await expect.poll(async () => (await store(quick.page)).mic).toBe(true);
+    await expect.poll(async () => (await store(quick.page)).cam).toBe(true);
+    await expect(quick.page.locator('.tile video')).toHaveCount(1);
+  } finally {
+    await closeAll(people);
+  }
+});

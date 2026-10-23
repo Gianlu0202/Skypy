@@ -109,14 +109,19 @@ export function useDismiss(open: boolean, onClose: () => void, ...refs: RefObjec
       if (refs.some((r) => r.current?.contains(target))) return;
       close.current();
     };
+    // Capture phase + preventDefault: Escape closes only the innermost popover,
+    // not the panel or meeting shortcuts listening further out.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close.current();
+      if (e.key === 'Escape' && !e.defaultPrevented) {
+        e.preventDefault();
+        close.current();
+      }
     };
     window.addEventListener('pointerdown', onDown, true);
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
     return () => {
       window.removeEventListener('pointerdown', onDown, true);
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, true);
     };
   }, [open]);
 }
