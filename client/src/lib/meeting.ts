@@ -146,6 +146,10 @@ export class Meeting {
       },
     });
 
+    // We're inside the Join click: unlock audio playback now, while the browser
+    // still counts it as a user gesture (Safari and Firefox are strict about this).
+    void this.room.startAudio().catch(() => {});
+
     this.audioHost = document.createElement('div');
     this.audioHost.setAttribute('aria-hidden', 'true');
     this.audioHost.style.display = 'none';

@@ -66,7 +66,7 @@ async function download() {
 }
 
 /** Local dev server: loopback only, quiet logs, well-known dev keys (devkey/secret). */
-export const LIVEKIT_DEV_ARGS = ['--dev', '--bind', '127.0.0.1', '--node-ip', '127.0.0.1', '--logging.level', 'warn'];
+export const LIVEKIT_DEV_ARGS = ['--dev', '--bind', '127.0.0.1', '--logging.level', 'warn'];
 
 export async function ensureLivekit() {
   const local = path.join(binDir, exe);
