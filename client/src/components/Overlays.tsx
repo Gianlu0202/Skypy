@@ -74,6 +74,12 @@ export function Banners({ meeting }: { meeting: Meeting }) {
         <Loader2 size={16} className="spin" /> Reconnecting audio and video…
       </div>,
     );
+  } else if (media === 'unsupported') {
+    items.push(
+      <div className="banner bad" key="media">
+        <WifiOff size={16} /> This browser can’t do video calls. Open the link in an up-to-date Chrome, Edge, Firefox or Safari.
+      </div>,
+    );
   } else if (media === 'failed') {
     items.push(
       <div className="banner bad" key="media">

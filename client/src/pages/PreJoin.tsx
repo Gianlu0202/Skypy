@@ -10,7 +10,7 @@ import { ArrowRight, Check, Copy, Crown, Mic, MicOff, Video, VideoOff, Volume2, 
 import { LIMITS, seatLabel, type RoomInfo } from '../../../shared/protocol.ts';
 import { Logo } from '../components/Logo.tsx';
 import { Avatar, VideoTrackView } from '../components/Media.tsx';
-import { CAMERA_RESOLUTION, describeMediaError, type JoinOptions } from '../lib/meeting.ts';
+import { CAMERA_RESOLUTION, MEDIA_SUPPORT, describeMediaError, type JoinOptions } from '../lib/meeting.ts';
 import { copyText, meetingUrl, plural } from '../lib/format.ts';
 import { navigate } from '../lib/router.ts';
 import { deviceKey, mediaPrefs, saveMediaPrefs, saveName, savedName } from '../lib/storage.ts';
@@ -123,8 +123,8 @@ export function PreJoin(props: {
   const { info, onJoin } = props;
   const prefs = useRef(mediaPrefs()).current;
   const [name, setName] = useState(() => info.you?.name || savedName());
-  const [camOn, setCamOn] = useState(prefs.camOn);
-  const [micOn, setMicOn] = useState(prefs.micOn);
+  const [camOn, setCamOn] = useState(prefs.camOn && MEDIA_SUPPORT.devices);
+  const [micOn, setMicOn] = useState(prefs.micOn && MEDIA_SUPPORT.devices);
   const [video, setVideo] = useState<LocalVideoTrack | null>(null);
   const [audio, setAudio] = useState<LocalAudioTrack | null>(null);
   const [camError, setCamError] = useState<string | null>(null);
@@ -300,7 +300,18 @@ export function PreJoin(props: {
               </div>
             )}
           </div>
-          {micError && <p className="preview-error">{micError}</p>}
+          {!MEDIA_SUPPORT.webrtc ? (
+            <p className="preview-warning">
+              This browser can’t do video calls. Open this link in an up-to-date Chrome, Edge, Firefox or Safari.
+            </p>
+          ) : !MEDIA_SUPPORT.secure ? (
+            <p className="preview-warning">
+              This link isn’t secure (it doesn’t start with https://), so your browser blocks the camera and microphone. You can still join
+              to watch and chat — ask the host for the https link to use your camera.
+            </p>
+          ) : (
+            micError && <p className="preview-error">{micError}</p>
+          )}
           <div className="device-row">
             <label className="device-select">
               <Video size={15} />

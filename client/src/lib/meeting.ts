@@ -41,6 +41,13 @@ export interface JoinOptions {
 export const LITE = (window as unknown as { __skypyLite?: boolean }).__skypyLite === true;
 export const CAMERA_RESOLUTION = LITE ? VideoPresets.h180.resolution : VideoPresets.h720.resolution;
 
+/** What this browser can do: video calls need WebRTC; cameras also need https. */
+export const MEDIA_SUPPORT = {
+  webrtc: typeof RTCPeerConnection !== 'undefined',
+  devices: typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia,
+  secure: typeof window === 'undefined' || window.isSecureContext,
+};
+
 let current: Meeting | null = null;
 
 /** Keep chat we already have across reconnects (a restarted server starts empty). */
@@ -68,6 +75,9 @@ function isDeviceError(err: unknown): boolean {
 }
 
 export function describeMediaError(err: unknown, what: 'camera' | 'microphone' | 'screen'): string | null {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+    return 'Your browser only allows cameras and microphones on secure (https://) links. Ask the host for the https link.';
+  }
   const name = (err as { name?: string })?.name ?? '';
   const label = what === 'screen' ? 'screen sharing' : `your ${what}`;
   if (name === 'NotAllowedError' || name === 'SecurityError') {
@@ -196,7 +206,8 @@ export class Meeting {
         });
         this.applyState(msg.state, msg.host);
         const lkState = this.room.state;
-        if (lkState === ConnectionState.Disconnected && !this.connecting) void this.connectMedia();
+        if (!MEDIA_SUPPORT.webrtc) useStore.setState({ media: 'unsupported' });
+        else if (lkState === ConnectionState.Disconnected && !this.connecting) void this.connectMedia();
         return;
       }
       case 'state':

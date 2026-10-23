@@ -3,7 +3,7 @@ import type { ChatMessage, HostData, RoomState } from '../../../shared/protocol.
 import type { SignalStatus } from './signal.ts';
 import { saveUiPrefs, uiPrefs, type UiPrefs } from './storage.ts';
 
-export type MediaStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'failed';
+export type MediaStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'failed' | 'unsupported';
 export type Panel = 'people' | 'chat' | 'seats' | null;
 export type EndKind = 'left' | 'kicked' | 'replaced' | 'denied' | 'error';
 
