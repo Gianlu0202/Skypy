@@ -4,7 +4,7 @@ import { LIMITS } from '../../../shared/protocol.ts';
 import { HeroDemo } from '../components/HeroDemo.tsx';
 import { Logo } from '../components/Logo.tsx';
 import { Stepper } from '../components/Controls.tsx';
-import { createRoom, getConfig } from '../lib/api.ts';
+import { ApiError, createRoom, getConfig } from '../lib/api.ts';
 import { copyText, meetingUrl } from '../lib/format.ts';
 import { navigate, parseRoomInput } from '../lib/router.ts';
 import { forgetHostedRoom, hostedRooms, rememberHostedRoom, saveCreateCode, savedCreateCode, type HostedRoom } from '../lib/storage.ts';
@@ -127,6 +127,8 @@ function CreateCard() {
       rememberHostedRoom({ id: res.id, name: title, hostKey: res.hostKey });
       navigate(`/r/${res.id}`);
     } catch (err) {
+      // The server wants an access code we didn't know about: show the field.
+      if ((err as ApiError).status === 403) setNeedsCode(true);
       setError((err as Error).message);
       setBusy(false);
     }

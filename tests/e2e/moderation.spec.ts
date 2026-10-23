@@ -78,6 +78,12 @@ test('host can mute and remove people; removed people cannot rejoin', async ({ b
     await noisy.page.getByPlaceholder('Your full name').fill('Noisy Student');
     await noisy.page.getByRole('button', { name: /Join now/ }).click();
     await expect(noisy.page.getByText('The host removed you from this meeting.')).toBeVisible();
+
+    // …and typing a different name from the same browser doesn't get them back in.
+    await noisy.page.goto(`/r/${room.id}`);
+    await noisy.page.getByPlaceholder('Your full name').fill('Totally Someone Else');
+    await noisy.page.getByRole('button', { name: /Join now/ }).click();
+    await expect(noisy.page.getByText('The host removed you from this meeting.')).toBeVisible();
   } finally {
     await closeAll(people);
   }
@@ -161,4 +167,12 @@ test('co-hosts never receive the room’s host key', async ({ browser }) => {
   } finally {
     await closeAll(people);
   }
+});
+
+test('room names with $ and HTML characters render literally in the page and link previews', async () => {
+  const room = await createRoom({ name: 'Q&A $& <b>Stats</b> $` $$', rows: 2, cols: 2 });
+  const html = await (await fetch(`${process.env.BASE ?? 'http://localhost:3000'}/r/${room.id}`)).text();
+  expect(html).toContain('<title>Q&amp;A $&amp; &lt;b&gt;Stats&lt;/b&gt; $` $$ · Skypy</title>');
+  expect(html.match(/<title>/g)?.length).toBe(1);
+  expect(html).toContain('<meta property="og:title" content="Q&amp;A $&amp; &lt;b&gt;Stats&lt;/b&gt; $` $$ · Skypy" />');
 });

@@ -231,7 +231,9 @@ function pageHtml(template: string, req: Request): string {
     `<meta property="og:image" content="${escapeHtml(origin)}/og.png" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
   ].join('\n    ');
-  return template.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(title)}</title>\n    ${tags}`);
+  const head = `<title>${escapeHtml(title)}</title>\n    ${tags}`;
+  // A replacer function keeps "$&" and friends in room names literal.
+  return template.replace(/<title>[^<]*<\/title>/, () => head);
 }
 
 if (fs.existsSync(indexHtml)) {

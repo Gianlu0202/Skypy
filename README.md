@@ -72,6 +72,7 @@ npm run dev
 
 Open **http://localhost:5173**. On Windows and Linux, `npm run dev` downloads and starts a
 local LiveKit media server automatically (on macOS run `brew install livekit` once).
+`npm run local` does the same with the optimized production build on **http://localhost:3000**.
 
 To try a meeting with several people on one computer, open the link in a few browser
 windows (use a private window for each extra "person").

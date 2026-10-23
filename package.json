@@ -2,7 +2,7 @@
   "name": "skypy",
   "version": "1.0.0",
   "private": true,
-  "description": "Group video meetings where everyone keeps their seat — fixed seating, shared screens in the middle, every face stays on screen.",
+  "description": "Group video meetings where everyone keeps their seat \u2014 fixed seating, shared screens in the middle, every face stays on screen.",
   "type": "module",
   "engines": {
     "node": ">=20.12"
@@ -11,6 +11,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "vite build && node scripts/build-server.mjs",
     "start": "node dist/server/index.js",
+    "local": "npm run build && node scripts/dev.mjs --prod",
     "livekit": "node scripts/livekit.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",

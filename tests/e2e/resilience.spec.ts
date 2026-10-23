@@ -35,9 +35,9 @@ test('a dropped connection recovers into the same seat', async ({ browser }) => 
     const id = (await store(flaky.page)).sessionId!;
     await expect.poll(async () => (await store(flaky.page)).media).toBe('connected');
 
+    // (Chromium's offline emulation still answers WebSocket pings, so the server
+    // can't notice this one; the client must notice and recover by itself.)
     await flaky.ctx.setOffline(true);
-    // Host sees the seat held with a reconnecting badge.
-    await expect(host.page.locator(`.tile[data-identity="${id}"] .tile-status`)).toBeVisible({ timeout: 40_000 });
     await expect(flaky.page.locator('.banner')).toBeVisible({ timeout: 40_000 });
 
     await flaky.ctx.setOffline(false);
@@ -45,6 +45,7 @@ test('a dropped connection recovers into the same seat', async ({ browser }) => 
     await expect.poll(async () => (await store(flaky.page)).media, { timeout: 45_000 }).toBe('connected');
     expect(await seatOf(flaky.page)).toBe(1);
     await expect(host.page.locator(`.tile[data-identity="${id}"] .tile-status`)).toHaveCount(0, { timeout: 30_000 });
+    expect(id).toBe((await store(flaky.page)).sessionId);
   } finally {
     await closeAll(people);
   }
@@ -82,6 +83,26 @@ test('clicking Join instantly still turns on camera and microphone', async ({ br
     await expect.poll(async () => (await store(quick.page)).mic).toBe(true);
     await expect.poll(async () => (await store(quick.page)).cam).toBe(true);
     await expect(quick.page.locator('.tile video')).toHaveCount(1);
+  } finally {
+    await closeAll(people);
+  }
+});
+
+test('a vanished person shows as reconnecting, keeps their seat, then frees it', async ({ browser }) => {
+  const room = await createRoom({ name: 'Vanish', rows: 2, cols: 3 });
+  const people: Person[] = [];
+  try {
+    const host = await join(browser, room, 'Prof Bill', { hostKey: room.hostKey });
+    const gone = await join(browser, room, 'Laptop Lid');
+    people.push(host);
+    const id = (await store(gone.page)).sessionId!;
+    await expect.poll(async () => (await store(gone.page)).media).toBe('connected');
+    // The browser disappears without saying goodbye.
+    await gone.ctx.close();
+    await expect(host.page.locator(`.tile[data-identity="${id}"] .tile-status`)).toBeVisible({ timeout: 30_000 });
+    // After the grace period the tile goes, and the seat stays reserved for them.
+    await expect(host.page.locator(`.tile[data-identity="${id}"]`)).toHaveCount(0, { timeout: 60_000 });
+    await expect(host.page.locator('.seat', { hasText: 'Laptop Lid' })).toBeVisible();
   } finally {
     await closeAll(people);
   }

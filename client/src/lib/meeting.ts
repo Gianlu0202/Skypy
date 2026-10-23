@@ -235,7 +235,6 @@ export class Meeting {
         return;
       case 'notice':
         toast(msg.text, { tone: msg.level === 'warn' ? 'warn' : 'info' });
-        if (/muted you|muted everyone/.test(msg.text)) useStore.setState({ mic: false });
         return;
       case 'kicked':
         this.end('kicked', msg.reason);
@@ -465,6 +464,7 @@ export class Meeting {
         } catch (err) {
           console.warn('[skypy] publishing microphone failed', err);
           initial.audio.stop();
+          this.wantMic = false;
           if (!this.stopped) toast('Couldn’t share your microphone. Try toggling it again.', { tone: 'warn' });
         }
       }
@@ -475,6 +475,7 @@ export class Meeting {
           } catch (err) {
             console.warn('[skypy] publishing camera failed', err);
             initial.video.stop();
+            this.wantCam = false;
             if (!this.stopped) toast('Couldn’t share your camera. Try toggling it again.', { tone: 'warn' });
           }
         } else {
@@ -617,9 +618,11 @@ export class Meeting {
     useStore.setState({ audioBlocked: !this.room.canPlaybackAudio });
   }
 
-  rename(name: string): void {
+  rename(name: string): boolean {
+    // Only adopt the new name once it has actually been sent.
+    if (!this.send({ t: 'rename', name })) return false;
     this.name = name;
-    this.send({ t: 'rename', name });
+    return true;
   }
 
   // ───────────────────────── lifecycle ─────────────────────────

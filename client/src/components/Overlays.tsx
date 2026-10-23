@@ -169,7 +169,7 @@ export function SettingsDialog({ meeting, onClose }: { meeting: Meeting; onClose
     e.preventDefault();
     const clean = name.trim().slice(0, LIMITS.nameLength);
     if (!clean || clean === me?.name) return;
-    meeting.rename(clean);
+    if (!meeting.rename(clean)) return;
     saveName(clean);
     toast('Name updated.', { tone: 'success', ttl: 2000 });
   };

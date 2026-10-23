@@ -44,6 +44,10 @@ class RoomRuntime {
   startedAt: number | null = null;
   /** Members removed by a host; they can't rejoin until the meeting ends. */
   removed = new Set<string>();
+  /** Devices of removed members (so typing a different name doesn't help). */
+  removedDevices = new Set<string>();
+  /** Serialises media-permission updates so rapid toggles apply in order. */
+  permissions: Promise<unknown> = Promise.resolve();
   pending = false;
   idleTimer: NodeJS.Timeout | null = null;
   constructor(public record: RoomRecord) {}
@@ -151,7 +155,19 @@ function newMemberId(): string {
 export class Hub {
   private runtimes = new Map<string, RoomRuntime>();
 
-  constructor(private store: RoomStore) {}
+  constructor(private store: RoomStore) {
+    // Note once a minute that meetings are still running (see liveAt).
+    setInterval(() => this.touchLive(), 60_000).unref();
+  }
+
+  /** Record that rooms with people in them are live right now. */
+  touchLive(): void {
+    for (const rt of this.runtimes.values()) {
+      if (rt.sessions.size === 0) continue;
+      rt.record.liveAt = Date.now();
+      this.store.save(rt.record.id);
+    }
+  }
 
   /** Number of people currently connected to a room. */
   online(roomId: string): number {
@@ -165,7 +181,7 @@ export class Hub {
     if (!record) return undefined;
     rt = new RoomRuntime(record);
     // After a restart, a meeting that was running a moment ago keeps its clock.
-    if (record.liveSince && Date.now() - record.updatedAt < 5 * 60_000) rt.startedAt = record.liveSince;
+    if (record.liveSince && record.liveAt && Date.now() - record.liveAt < 5 * 60_000) rt.startedAt = record.liveSince;
     this.runtimes.set(roomId, rt);
     return rt;
   }
@@ -174,25 +190,29 @@ export class Hub {
 
   accept(ws: WebSocket): void {
     let current: { rt: RoomRuntime; session: Session } | null = null;
-    let alive = true;
+    // Clients ping every 10 s; a socket silent for 25 s is dead (laptop lid
+    // closed, Wi-Fi gone) even if TCP hasn't noticed yet.
+    let heardAt = Date.now();
     ws.on('pong', () => {
-      alive = true;
+      heardAt = Date.now();
     });
     const heartbeat = setInterval(() => {
-      if (!alive) {
+      const silent = Date.now() - heardAt;
+      if (silent > 25_000) {
         ws.terminate();
         return;
       }
-      alive = false;
-      try {
-        ws.ping();
-      } catch {
-        /* socket already closing */
+      if (silent > 8_000) {
+        try {
+          ws.ping();
+        } catch {
+          /* socket already closing */
+        }
       }
-    }, 20_000);
+    }, 5_000);
 
     ws.on('message', (data, isBinary) => {
-      alive = true;
+      heardAt = Date.now();
       if (isBinary) return;
       let parsed: ClientMsg;
       try {
@@ -245,7 +265,7 @@ export class Hub {
     if (!rt) return this.deny(ws, 'not_found', 'This meeting link is not valid. Check the link or ask the host for a new one.');
     const joined = this.admit(ws, rt, msg);
     // Don't keep a runtime alive for a room nobody managed to join.
-    if (!joined && rt.sessions.size === 0 && !rt.idleTimer) this.scheduleIdle(rt);
+    if (!joined && rt.sessions.size === 0 && !rt.idleTimer) this.scheduleEviction(rt);
     return joined;
   }
 
@@ -255,7 +275,17 @@ export class Hub {
     const name = cleanName(msg.name);
     if (!name) return this.deny(ws, 'bad_request', 'Please enter your name.');
 
-    const member = this.resolveMember(rt, { name, deviceKey: msg.deviceKey, invite: msg.invite });
+    const deviceHash = hashKey(msg.deviceKey);
+    // The tab key proves "same browser, same tab" without revealing the tab id.
+    const tabKey = hashKey(`${msg.deviceKey}:${msg.tabId}`).slice(0, 16);
+    // A tab reconnecting keeps its person, even if the name changed meanwhile.
+    const sameTab = [...rt.sessions.values()].find((x) => x.tabKey === tabKey);
+    const member =
+      (sameTab && !msg.invite ? memberOf(room, sameTab.memberId) : undefined) ??
+      this.resolveMember(rt, { name, deviceKey: msg.deviceKey, invite: msg.invite });
+    if (!owner && (rt.removedDevices.has(deviceHash) || (member && rt.removed.has(member.id)))) {
+      return this.deny(ws, 'removed', 'The host removed you from this meeting.');
+    }
     if (!member && room.settings.locked && !owner) {
       return this.deny(
         ws,
@@ -263,13 +293,7 @@ export class Hub {
         'This meeting is locked. Only people on the seating roster can join — ask the host for your personal link.',
       );
     }
-    if (member && rt.removed.has(member.id) && !owner) {
-      return this.deny(ws, 'removed', 'The host removed you from this meeting.');
-    }
 
-    const deviceHash = hashKey(msg.deviceKey);
-    // The tab key proves "same browser, same tab" without revealing the tab id.
-    const tabKey = hashKey(`${msg.deviceKey}:${msg.tabId}`).slice(0, 16);
     const resuming = !!member && rt.sessions.has(`${member.id}.${tabKey}`);
     if (!resuming) {
       const sessions = [...rt.sessions.values()];
@@ -331,6 +355,7 @@ export class Hub {
     }
     rt.startedAt ??= Date.now();
     room.liveSince = rt.startedAt;
+    room.liveAt = Date.now();
 
     this.reseat(rt);
     this.store.save(room.id);
@@ -371,9 +396,22 @@ export class Hub {
     return livekit.createToken({ roomId: rt.record.id, identity: s.id, name: s.name, screenShare: this.canShareScreen(rt, s) });
   }
 
-  /** Re-apply media permissions (screen sharing) after a policy or role change. */
+  /**
+   * Re-apply media permissions (screen sharing) after a policy or role change,
+   * in order, and give everyone a fresh token carrying the new rights for
+   * their next reconnect.
+   */
   private syncPermissions(rt: RoomRuntime): void {
-    for (const s of rt.sessions.values()) void livekit.setScreenSharePermission(rt.record.id, s.id, this.canShareScreen(rt, s));
+    const targets = [...rt.sessions.values()].map((s) => ({ s, allowed: this.canShareScreen(rt, s) }));
+    rt.permissions = rt.permissions.then(() =>
+      Promise.all(targets.map(({ s, allowed }) => livekit.setScreenSharePermission(rt.record.id, s.id, allowed))),
+    );
+    for (const { s } of targets) {
+      void this.mediaToken(rt, s).then(
+        (token) => send(s.ws, { t: 'token', token }),
+        () => {},
+      );
+    }
   }
 
   private resolveMember(rt: RoomRuntime, who: { name: string; deviceKey: string; invite?: string }): MemberRecord | null {
@@ -453,16 +491,23 @@ export class Hub {
     }
     this.reseat(rt);
     this.store.save(rt.record.id);
-    if (rt.sessions.size === 0) this.scheduleIdle(rt);
+    if (rt.sessions.size === 0) this.endMeeting(rt);
     if (notify) this.broadcast(rt);
   }
 
-  private scheduleIdle(rt: RoomRuntime): void {
+  /** The last person left: the meeting is over. */
+  private endMeeting(rt: RoomRuntime): void {
     rt.startedAt = null;
     rt.record.liveSince = null;
+    rt.record.liveAt = null;
     this.store.save(rt.record.id);
     rt.removed.clear();
+    rt.removedDevices.clear();
     rt.spotlight = null;
+    this.scheduleEviction(rt);
+  }
+
+  private scheduleEviction(rt: RoomRuntime): void {
     if (rt.idleTimer) clearTimeout(rt.idleTimer);
     // Keep chat around briefly in case people rejoin, then drop the runtime.
     rt.idleTimer = setTimeout(() => {
@@ -496,7 +541,11 @@ export class Hub {
 
       case 'rename': {
         const name = cleanName(msg.name);
-        if (!name || !this.allow(s, 'rename', 5, 10_000)) return;
+        if (!name) return;
+        if (!this.allow(s, 'rename', 5, 10_000)) {
+          send(s.ws, { t: 'notice', level: 'warn', text: 'Too many name changes — wait a few seconds and try again.' });
+          return;
+        }
         s.name = name;
         const m = memberOf(room, s.memberId);
         if (m) {
@@ -684,21 +733,22 @@ export class Hub {
       case 'muteAll': {
         for (const target of rt.sessions.values()) {
           if (target === s || target.host) continue;
-          void livekit.muteMicrophone(room.id, target.id);
-        }
-        for (const target of rt.sessions.values()) {
-          if (target !== s && !target.host) send(target.ws, { t: 'notice', level: 'info', text: `${s.name} muted everyone.` });
+          void livekit.muteMicrophone(room.id, target.id).then((ok) => {
+            if (ok) send(target.ws, { t: 'notice', level: 'info', text: `${s.name} muted everyone.` });
+          });
         }
         return;
       }
 
       case 'kick': {
         const target = rt.sessions.get(msg.sessionId);
-        if (!target || target.memberId === s.memberId || (target.owner && !s.owner)) return;
+        if (!target || target.memberId === s.memberId) return;
+        const windows = [...rt.sessions.values()].filter((x) => x.memberId === target.memberId);
+        if (!s.owner && windows.some((x) => x.owner)) return; // co-hosts can't remove the owner
         rt.removed.add(target.memberId);
+        for (const w of windows) rt.removedDevices.add(w.deviceHash);
         // Remove every window of that person and revoke their media tokens.
-        for (const other of [...rt.sessions.values()]) {
-          if (other.memberId !== target.memberId) continue;
+        for (const other of windows) {
           send(other.ws, { t: 'kicked', reason: `${s.name} removed you from the meeting.` });
           void livekit.removeParticipant(room.id, other.id, { revoke: true });
           this.removeSession(rt, other, false);
@@ -799,6 +849,7 @@ export class Hub {
 
   /** Close every socket (used on shutdown so clients reconnect promptly). */
   closeAll(): void {
+    this.touchLive();
     for (const rt of this.runtimes.values()) {
       for (const s of rt.sessions.values()) s.ws?.close(1012, 'restart');
     }

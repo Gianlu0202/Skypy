@@ -249,7 +249,9 @@ export function PreJoin(props: {
     onJoin({ name: clean, audio, video, micOn, camOn });
   }
 
-  const seat = info.you?.seat ?? null;
+  // The seat we know about belongs to the name we found; a different name is a different person.
+  const sameName = !!info.you?.name && name.trim().replace(/\s+/g, ' ').toLowerCase() === info.you.name.toLowerCase();
+  const seat = sameName ? (info.you?.seat ?? null) : null;
   const isHost = !!info.you?.host;
   const others = info.online;
   const deviceLabel = (d: MediaDeviceInfo, i: number, kind: string) => d.label || `${kind} ${i + 1}`;
